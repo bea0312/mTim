@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "11757436441",
+    "project_id": "mtim-46495",
+    "storage_bucket": "mtim-46495.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:11757436441:android:ebafa96ae0fe6a932c3488",
+        "android_client_info": {
+          "package_name": "com.example.mtim"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBSSHg3CCzGONDAfpuRGAgGsktmBebQik"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
