@@ -313,7 +313,6 @@ class _TrainingsPageState extends State<TrainingsPage> {
                       child: GestureDetector(
                         onTap: () {
                           _openNewTrainigDialog(context);
-                          FirebaseApi().initPushNotifications();
                           _getAllTrainings();
                         },
                         child: Container(

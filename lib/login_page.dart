@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:mtim/Trener/home_page_trener.dart';
+import 'package:mtim/firebase_api.dart';
 import 'package:mtim/member_home_page.dart';
+import 'package:mtim/storeFcmToken.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -67,11 +69,16 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> signIn() async {
     try {
+      print('Attempting to sign in...');
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      print('Sign in successful, navigating...');
       route();
+      await storeFCMToken();
+
+      print('FCM token stored successfully.');
     } catch (e) {
       print('Error signing in: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -91,122 +98,120 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                const Text(
-                  'Login',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 30,
-                  ),
-                ),
-                const SizedBox(height: 50),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: const Color.fromARGB(157, 173, 24, 199),
-                          width: 2.0,
-                        )),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                      child: TextField(
-                        controller: _emailController,
-                        decoration: InputDecoration(
-                          enabledBorder: OutlineInputBorder(
-                            borderSide:
-                                const BorderSide(color: Colors.transparent),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          hintText: 'Email',
-                          hintStyle: const TextStyle(color: Colors.black),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: const BorderSide(
-                                color: Color.fromRGBO(224, 64, 251, 1)),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                      ),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+              image: AssetImage("images/img.png"), fit: BoxFit.cover),
+        ),
+        child: Center(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const Text(
+                    'Svetojanske mažoretkinje',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 35,
+                      fontFamily: 'cursive',
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 30.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: const Color.fromARGB(157, 173, 24, 199),
-                          width: 2.0,
-                        )),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 0.0),
-                      child: TextField(
-                        obscureText: true,
-                        controller: _passwordController,
-                        decoration: InputDecoration(
-                          enabledBorder: OutlineInputBorder(
-                            borderSide:
-                                const BorderSide(color: Colors.transparent),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          hintText: 'Password',
-                          hintStyle: const TextStyle(color: Colors.black),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: const BorderSide(
-                                color: const Color.fromRGBO(224, 64, 251, 1)),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 50),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 70),
-                  child: GestureDetector(
-                    onTap: signIn,
+                  const SizedBox(height: 50),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30.0),
                     child: Container(
-                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: const Color.fromARGB(157, 173, 24, 199),
-                          width: 2.0,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.5),
-                            spreadRadius: 2,
-                            blurRadius: 3,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
                       ),
-                      child: const Center(
-                        child: Text(
-                          'Login',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                        child: TextField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            enabledBorder: OutlineInputBorder(
+                              borderSide:
+                                  const BorderSide(color: Colors.transparent),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            hintText: 'Email',
+                            hintStyle: const TextStyle(color: Colors.black),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(
+                                  color: Color.fromRGBO(224, 64, 251, 1)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 0.0),
+                        child: TextField(
+                          obscureText: true,
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            enabledBorder: OutlineInputBorder(
+                              borderSide:
+                                  const BorderSide(color: Colors.transparent),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            hintText: 'Password',
+                            hintStyle: const TextStyle(color: Colors.black),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(
+                                  color: const Color.fromRGBO(224, 64, 251, 1)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 120),
+                    child: GestureDetector(
+                      onTap: signIn,
+                      child: Container(
+                        height: 40,
+                        //padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.5),
+                              spreadRadius: 2,
+                              blurRadius: 3,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Prijavi se',
+                            style: TextStyle(
+                              color: Colors.purple,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

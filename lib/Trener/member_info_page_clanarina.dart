@@ -39,22 +39,17 @@ class _MemberInfoPageClanarinaState extends State<MemberInfoPageClanarina> {
           .where('Razdoblje', isEqualTo: currentRazdoblje)
           .orderBy('Razdoblje', descending: true)
           .get();
-
       if (clanarinaSnapshot.docs.isEmpty) {
         DocumentReference clanarinaDocRef =
             await FirebaseFirestore.instance.collection('Clanarina').add({
           'Razdoblje': currentRazdoblje,
         });
-
         QuerySnapshot membersSnapshot =
             await FirebaseFirestore.instance.collection('Clanica').get();
-
         for (var memberDoc in membersSnapshot.docs) {
           var memberData = memberDoc.data() as Map<String, dynamic>;
-          cijenaClanarine = memberData['CijenaClanarine'] ?? '25';
-        }
-
-        for (var memberDoc in membersSnapshot.docs) {
+          String cijenaClanarine =
+              memberData['CijenaClanarine']?.toString() ?? '25';
           await FirebaseFirestore.instance.collection('Clanica_Clanarina').add({
             'ClanicaUID': memberDoc.id,
             'ClanarinaUID': clanarinaDocRef.id,

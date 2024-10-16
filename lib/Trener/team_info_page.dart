@@ -180,10 +180,15 @@ class _TeamInfoPageState extends State<TeamInfoPage> {
     }
   }*/
 
+  double _percentageOutOfAgeGroup() {
+    return (numOfMembersOutOfAgeGroup / numberOfMembers) * 100;
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+    double percentageOutOfAgeGroup = _percentageOutOfAgeGroup();
 
     return Scaffold(
       body: Center(
@@ -232,6 +237,16 @@ class _TeamInfoPageState extends State<TeamInfoPage> {
                     thickness: 2,
                     indent: 0,
                     endIndent: 16,
+                  ),
+                  Column(
+                    children: [
+                      Text('Postotak izvan dobnog rareda'),
+                      Text(
+                        '${percentageOutOfAgeGroup.toStringAsFixed(1)}%',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      )
+                    ],
                   ),
                   Padding(
                     padding: EdgeInsets.only(top: screenHeight * 0.2),

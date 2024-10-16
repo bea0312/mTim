@@ -11,27 +11,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class FirebaseApi {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
-  String? pocetak;
-  String? mjesto;
   String? userTim;
   bool isLoading = true;
 
-  String _formatTimeOnly(Timestamp timestamp) {
+  DateTime formatTimeOnly(Timestamp timestamp) {
     DateTime date = timestamp.toDate();
-    return DateFormat('dd.MM.yyyy HH:mm').format(date);
+    return date;
   }
 
-  Future<void> initPushNotifications() async {
+  Future<void> initPushNotifications(String place, DateTime start) async {
     await fetchUserTim();
-    FirebaseMessaging.onMessage.listen(handleMessage);
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print("Notification clicked and app opened");
     });
-    _listenToFirestoreChanges();
+    _sendTrainingNotification(place, start);
   }
 
   Future<void> initMembershipNotification(String? period) async {
-    FirebaseMessaging.onMessage.listen(handleMessage);
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print("Notification clicked and app opened");
     });
@@ -66,21 +62,15 @@ class FirebaseApi {
     }
   }
 
-  void handleMessage(RemoteMessage message) {
-    print("Foreground message received: ${message.notification?.title}");
-    showLocalNotification(
-        message.notification?.title, message.notification?.body);
-  }
-
-  void _listenToFirestoreChanges() {
+  void _listenToFirestoreChanges(String mjesto, DateTime pocetak) {
     FirebaseFirestore.instance.collection('Tim_Trening').snapshots().listen(
       (QuerySnapshot snapshot) {
         for (var change in snapshot.docChanges) {
           if (change.type == DocumentChangeType.added) {
             var trainingData = change.doc.data() as Map<String, dynamic>?;
-            pocetak = trainingData != null && trainingData['Početak'] != null
-                ? _formatTimeOnly(trainingData['Početak'])
-                : null;
+            pocetak = (trainingData != null && trainingData['Početak'] != null
+                ? formatTimeOnly(trainingData['Početak'])
+                : null)!;
             mjesto = trainingData?['Mjesto'];
             String? tim = trainingData?['Tim'];
             if (pocetak != null &&
@@ -88,7 +78,7 @@ class FirebaseApi {
                 tim != null &&
                 userTim != null) {
               if (tim.trim().toLowerCase() == userTim!.trim().toLowerCase()) {
-                _sendTrainingNotification(pocetak!, mjesto!);
+                _sendTrainingNotification(mjesto, pocetak);
               } else {
                 print("The document's 'Tim' does not match the user's 'Tim'.");
               }
@@ -102,7 +92,8 @@ class FirebaseApi {
     );
   }
 
-  Future<void> _sendTrainingNotification(String title, String date) async {
+  Future<void> _sendTrainingNotification(
+      String mjesto, DateTime pocetak) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'training_channel',
@@ -115,10 +106,12 @@ class FirebaseApi {
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
 
+    String start = DateFormat('dd.MM.yyyy HH:mm').format(pocetak);
+
     await flutterLocalNotificationsPlugin.show(
       0,
-      'Novi trening!',
-      'Vrijeme i mjesto održavanja: $pocetak, $mjesto',
+      'Danas trening!',
+      'Vrijeme i mjesto održavanja: $start, $mjesto',
       platformChannelSpecifics,
     );
   }
@@ -140,27 +133,6 @@ class FirebaseApi {
       0,
       'Nepodmirena članarina!',
       'Postoji nepodmirena članarina za $period',
-      platformChannelSpecifics,
-    );
-  }
-
-  Future<void> showLocalNotification(String? title, String? body) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'default_channel',
-      'Default Notifications',
-      channelDescription: 'Default notification channel',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    await flutterLocalNotificationsPlugin.show(
-      0,
-      title ?? 'Novi trening!',
-      body ?? 'Vrijeme i mjesto pogledaj u aplikaciji.',
       platformChannelSpecifics,
     );
   }

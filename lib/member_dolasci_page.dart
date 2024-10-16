@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mtim/firebase_api.dart';
 
 class MemberDolasciPage extends StatefulWidget {
   const MemberDolasciPage({super.key});
@@ -49,68 +50,74 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
     }
   }
 
-  Future<void> _getAllTrainings() async {
+  void _getAllTrainings() {
     if (userId == null) return;
 
-    try {
-      QuerySnapshot trainingSnapshot = await FirebaseFirestore.instance
-          .collection('Clanica_Tim_Trening')
-          .where('ClanicaUID', isEqualTo: userId)
-          .get();
-
-      if (trainingSnapshot.docs.isEmpty) {
+    FirebaseFirestore.instance
+        .collection('Clanica_Tim_Trening')
+        .where('ClanicaUID', isEqualTo: userId)
+        .snapshots()
+        .listen((querySnapshot) async {
+      if (querySnapshot.docs.isEmpty) {
         print('No documents found for ClanicaUID: $userId');
         return;
       }
 
       Map<String, List<Map<String, dynamic>>> groupedTrainings = {};
+      List<Future<void>> fetchTasks = [];
 
-      for (var doc in trainingSnapshot.docs) {
+      for (var doc in querySnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
         var timTreningId = data['Tim_TreningUID'];
-        DocumentSnapshot timTreningSnapshot = await FirebaseFirestore.instance
+
+        fetchTasks.add(FirebaseFirestore.instance
             .collection('Tim_Trening')
             .doc(timTreningId)
-            .get();
+            .get()
+            .then((timTreningSnapshot) {
+          if (!timTreningSnapshot.exists) {
+            print('No Tim_Trening document found with ID: $timTreningId');
+            return;
+          }
 
-        if (!timTreningSnapshot.exists) {
-          print('No Tim_Trening document found with ID: $timTreningId');
-          continue;
-        }
+          var timTreningData =
+              timTreningSnapshot.data() as Map<String, dynamic>;
+          Timestamp pocetak = timTreningData['Početak'];
+          String monthKey = DateFormat('MM/yyyy').format(pocetak.toDate());
 
-        var timTreningData = timTreningSnapshot.data() as Map<String, dynamic>;
-        Timestamp pocetak = timTreningData['Početak'];
-        String monthKey = DateFormat('MM/yyyy').format(pocetak.toDate());
+          var treningData = {
+            'DocId': doc.id,
+            'Dolazak': data['Dolazak'] != null
+                ? _formatTimestamp(data['Dolazak'])
+                : null,
+            'Odlazak': data['Odlazak'] != null
+                ? _formatTimestamp(data['Odlazak'])
+                : null,
+            'Status': data['Status'],
+            'Datum': _formatDateOnly(pocetak),
+            'Početak': _formatTimestamp(pocetak),
+            'Kraj': _formatTimestamp(timTreningData['Kraj']),
+            'Mjesto': timTreningData['Mjesto'],
+            'TrainingStatus': timTreningData['Status'],
+            'IsToday': _checkIfTrainingToday(pocetak),
+          };
 
-        var treningData = {
-          'DocId': doc.id,
-          'Dolazak': data['Dolazak'] != null
-              ? _formatTimestamp(data['Dolazak'])
-              : null,
-          'Odlazak': data['Odlazak'] != null
-              ? _formatTimestamp(data['Odlazak'])
-              : null,
-          'Status': data['Status'],
-          'Datum': _formatDateOnly(pocetak),
-          'Početak': _formatTimestamp(pocetak),
-          'Kraj': _formatTimestamp(timTreningData['Kraj']),
-          'Mjesto': timTreningData['Mjesto'],
-          'TrainingStatus': timTreningData['Status'],
-        };
+          if (_checkIfTrainingToday(pocetak)) {
+            FirebaseApi().initPushNotifications(
+                timTreningData['Mjesto'], pocetak.toDate());
+          }
 
-        if (!groupedTrainings.containsKey(monthKey)) {
-          groupedTrainings[monthKey] = [];
-        }
-        groupedTrainings[monthKey]?.add(treningData);
+          if (!groupedTrainings.containsKey(monthKey)) {
+            groupedTrainings[monthKey] = [];
+          }
+          groupedTrainings[monthKey]?.add(treningData);
+        }));
       }
-
+      await Future.wait(fetchTasks);
       setState(() {
         monthlyTrainings = groupedTrainings;
-        print('Grouped trainings: $monthlyTrainings');
       });
-    } catch (e) {
-      print('Error retrieving trainings: $e');
-    }
+    });
   }
 
   String _formatTimestamp(Timestamp timestamp) {
@@ -121,6 +128,16 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
   String _formatDateOnly(Timestamp timestamp) {
     DateTime date = timestamp.toDate();
     return DateFormat('dd.MM.yyyy').format(date);
+  }
+
+  bool _checkIfTrainingToday(Timestamp? timestamp) {
+    if (timestamp == null) return false;
+    DateTime trainingDate = timestamp.toDate();
+    DateTime today = DateTime.now();
+
+    return trainingDate.year == today.year &&
+        trainingDate.month == today.month &&
+        trainingDate.day == today.day;
   }
 
   double _calculateAttendancePercentage(List<Map<String, dynamic>> trainings) {
@@ -199,7 +216,9 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
                               padding: const EdgeInsets.all(8.0),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.purple[100],
+                                  color: trening['IsToday'] == true
+                                      ? Colors.green[100]
+                                      : Colors.purple[100],
                                   borderRadius:
                                       BorderRadius.all(Radius.circular(15.0)),
                                 ),

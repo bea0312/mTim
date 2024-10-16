@@ -26,10 +26,12 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
   TextEditingController brojIskazniceController = TextEditingController();
   TextEditingController godinaPreregistracijeController =
       TextEditingController();
+  String dropdownValue = 'Dječji sastav';
 
   @override
   void initState() {
     super.initState();
+    dropdownValue = widget.memberData['Dobni razred'] ?? 'Dječji sastav';
     gdprValue = widget.memberData['GDPR'] ?? false;
     _checkForOverduePayments();
     brojIskazniceController.text = widget.memberData['Broj iskaznice'] ?? '';
@@ -65,6 +67,25 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
       print('Godina preregistracije updated: $newValue');
     } catch (e) {
       print('Error updating Godina preregistracije: $e');
+    }
+  }
+
+  Future<void> _updateDobniRazred(String newValue) async {
+    try {
+      String? memberId = widget.docId;
+      await FirebaseFirestore.instance
+          .collection('Clanica')
+          .doc(memberId)
+          .update({'Dobni razred': newValue});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Dobni razred updated successfully')),
+      );
+    } catch (e) {
+      print('Error updating member data: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update Dobni razred: $e')),
+      );
     }
   }
 
@@ -501,6 +522,40 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
                                 Column(
                                   children: [
                                     Center(
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 5),
+                                        child: DropdownButton<String>(
+                                          value: dropdownValue,
+                                          onChanged: (String? newValue) {
+                                            if (newValue != null) {
+                                              setState(() {
+                                                dropdownValue = newValue;
+                                              });
+                                              _updateDobniRazred(newValue);
+                                            }
+                                          },
+                                          items: <String>[
+                                            'Dječji sastav',
+                                            'Kadet',
+                                            'Junior',
+                                            'Senior',
+                                            'Veteran',
+                                          ].map<DropdownMenuItem<String>>(
+                                              (String value) {
+                                            return DropdownMenuItem<String>(
+                                              value: value,
+                                              child: Text(value),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  children: [
+                                    Center(
                                       child: GestureDetector(
                                         onTap: () {
                                           _chooseNewTeam(context);
@@ -530,7 +585,7 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
                                               Icon(Icons.upload_outlined,
                                                   color: Colors.purple),
                                               Text(
-                                                'Promijeni tim/dobni razred',
+                                                'Promijeni tim',
                                               ),
                                             ],
                                           ),
