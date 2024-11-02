@@ -92,8 +92,11 @@ class _HomePageContentState extends State<HomePageContent> {
                           builder: (context, snapshot) {
                             if (snapshot.hasData) {
                               final filteredDocs = snapshot.data?.docs
-                                  .where((doc) => doc['Uloga'] != 'Trener')
+                                  .where((doc) =>
+                                      doc['Uloga'] != 'Trener' &&
+                                      doc['Status'] != 'Ispis')
                                   .toList();
+
                               final members = filteredDocs?.where((member) {
                                 final memberData =
                                     member.data() as Map<String, dynamic>;
@@ -113,8 +116,6 @@ class _HomePageContentState extends State<HomePageContent> {
                                   final docId = member?.id;
                                   final godinaPreregistracije =
                                       memberData['Godina preregistracije'];
-
-                                  // Convert 'Godina preregistracije' to integer
                                   bool isCurrentYearWarning = false;
                                   if (godinaPreregistracije != null &&
                                       godinaPreregistracije.isNotEmpty) {
@@ -126,7 +127,6 @@ class _HomePageContentState extends State<HomePageContent> {
                                       isCurrentYearWarning = true;
                                     }
                                   }
-
                                   return GestureDetector(
                                     onTap: () {
                                       Navigator.push(

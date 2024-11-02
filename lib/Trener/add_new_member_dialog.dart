@@ -60,6 +60,7 @@ class _AddNewMemberDialogState extends State<AddNewMemberDialog> {
       'Članica od': DateTime.now().year,
       'Tim': widget.team,
       'Uloga': 'Plesač',
+      'Status': 'Upisana',
       'GDPR': false,
     };
 

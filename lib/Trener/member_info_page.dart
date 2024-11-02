@@ -89,6 +89,18 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
     }
   }
 
+  Future<void> _updateStatusIspis() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('Clanica')
+          .doc(widget.docId)
+          .update({'Status': 'Ispis'});
+      Navigator.of(context).pop();
+    } catch (e) {
+      print('Error updating member data: $e');
+    }
+  }
+
   void onChanged(bool? newValue) {
     setState(() {
       gdprValue = newValue ?? false;
@@ -202,6 +214,14 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
             ),
           ),
           titleSpacing: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.no_accounts_outlined, color: Colors.white),
+              onPressed: () {
+                _updateStatusIspis();
+              },
+            ),
+          ],
         ),
         body: Column(
           children: [

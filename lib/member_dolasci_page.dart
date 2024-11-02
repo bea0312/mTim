@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mtim/firebase_api.dart';
+import 'package:mtim/notification_service.dart';
 
 class MemberDolasciPage extends StatefulWidget {
   const MemberDolasciPage({super.key});
@@ -103,8 +104,10 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
           };
 
           if (_checkIfTrainingToday(pocetak)) {
-            FirebaseApi().initPushNotifications(
-                timTreningData['Mjesto'], pocetak.toDate());
+            /*FirebaseApi().initPushNotifications(
+                timTreningData['Mjesto'], pocetak.toDate());*/
+            NotificationService().showNotificationDanasTrening(
+                timTreningData['Mjesto'], pocetak.toString());
           }
 
           if (!groupedTrainings.containsKey(monthKey)) {

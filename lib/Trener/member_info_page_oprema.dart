@@ -125,12 +125,11 @@ class MemberInfoPageOpremaState extends State<MemberInfoPageOprema> {
               ? _formatDateOnly(data['Vracanje'])
               : 'N/A',
           'ClanicaUID': data['ClanicaUID'] ?? '',
-          'PreuzimanjeTimestamp': data['Preuzimanje'] as Timestamp? ??
-              Timestamp.now(), // Add timestamp for sorting
+          'PreuzimanjeTimestamp':
+              data['Preuzimanje'] as Timestamp? ?? Timestamp.now(),
         });
       }
 
-      // Sort by 'PreuzimanjeTimestamp' in descending order
       membersData.sort((a, b) =>
           b['PreuzimanjeTimestamp'].compareTo(a['PreuzimanjeTimestamp']));
 

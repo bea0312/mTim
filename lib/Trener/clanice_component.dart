@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class PostComponent extends StatelessWidget {
-  final String postId; // Add postId to identify the post
+  final String postId;
   final String ime;
   final String prezime;
 

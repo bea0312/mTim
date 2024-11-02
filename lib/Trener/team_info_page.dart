@@ -129,7 +129,6 @@ class _TeamInfoPageState extends State<TeamInfoPage> {
     if (Platform.isAndroid || Platform.isIOS) {
       OpenFile.open(filePath);
     } else {
-      // Handle other platforms or show an error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text('This platform is not supported for opening files.')),
@@ -169,7 +168,6 @@ class _TeamInfoPageState extends State<TeamInfoPage> {
                 child: Text('Open'),
                 onPressed: () {
                   Navigator.of(context).pop();
-                  // Open the file using the openFile function
                   openExcelFile(outputPath);
                 },
               ),

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mtim/firebase_api.dart';
+import 'package:mtim/notification_service.dart';
 
 class MemberClanarinaPage extends StatefulWidget {
   final Function(bool) onOverdueStatusChanged;
@@ -99,7 +100,9 @@ class _MemberClanarinaPageState extends State<MemberClanarinaPage> {
         );
 
         if (isOverdue) {
-          FirebaseApi().initMembershipNotification(clanarinaData['Razdoblje']);
+          //FirebaseApi().initMembershipNotification(clanarinaData['Razdoblje']);
+          NotificationService()
+              .showNotificationNepodmirenaClanarina(clanarinaData['Razdoblje']);
           overdueFound = true;
           print(
               'Overdue payment detected for clanarina period: ${clanarinaData['Razdoblje']}');

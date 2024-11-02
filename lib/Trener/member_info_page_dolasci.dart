@@ -133,7 +133,6 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
   Widget build(BuildContext context) {
     double attendancePercentage = _calculateAttendancePercentage(widget.docId);
     print('Att perc: $attendancePercentage');
-    //print('Building widget with trenings: $trenings');
     List<String> months = monthlyTrainings.keys.toList();
 
     return DefaultTabController(
