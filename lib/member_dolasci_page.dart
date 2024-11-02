@@ -107,7 +107,7 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
             /*FirebaseApi().initPushNotifications(
                 timTreningData['Mjesto'], pocetak.toDate());*/
             NotificationService().showNotificationDanasTrening(
-                timTreningData['Mjesto'], pocetak.toString());
+                timTreningData['Mjesto'], pocetak.toDate());
           }
 
           if (!groupedTrainings.containsKey(monthKey)) {

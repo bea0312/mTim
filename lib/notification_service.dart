@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
 class NotificationService {
@@ -70,7 +71,8 @@ class NotificationService {
     );
   }
 
-  Future<void> showNotificationDanasTrening(String place, String date) async {
+  Future<void> showNotificationDanasTrening(String place, DateTime date) async {
+    String start = DateFormat('dd.MM.yyyy HH:mm').format(date);
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       'channel_id_trening',
@@ -88,8 +90,8 @@ class NotificationService {
 
     await flutterLocalNotificationsPlugin.show(
       1,
-      'Danas trening',
-      'Mjesto: $place, vrijeme: $date.',
+      'Danas trening!',
+      'Mjesto: $place, vrijeme: $start.',
       platformDetails,
     );
   }
