@@ -1,12 +1,10 @@
 import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mtim/Trener/add_new_trainig_dialog.dart';
 import 'package:mtim/Trener/edit_training_dialog.dart';
-import 'package:mtim/firebase_api.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 
 class TrainingsPage extends StatefulWidget {
@@ -24,6 +22,10 @@ class _TrainingsPageState extends State<TrainingsPage> {
   Timer? _nfcStartSessionTimer;
   Timer? _nfcSessionTimer;
 
+  DateTime startDate = DateTime(2023, 11, 1);
+  DateTime endDate = DateTime(2024, 12, 31);
+  String _formatMonthId(DateTime date) => DateFormat('MM-yyyy').format(date);
+
   Future<void> fetchUserTim() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -39,20 +41,12 @@ class _TrainingsPageState extends State<TrainingsPage> {
             if (userData['Uloga'] == 'Trener') {
               setState(() {
                 userTim = userData['Tim'];
-                trainingsFuture = _getAllTrainings();
+                trainingsFuture =
+                    _getAllTrainings(userTim!, startDate, endDate);
               });
-              print('Called _getAllTrainings');
-            } else {
-              print('User is not a Trener');
             }
-          } else {
-            print('No user document found');
           }
-        } else {
-          print('User email is null');
         }
-      } else {
-        print('User is null');
       }
     } catch (e) {
       print('Error fetching user Tim: $e');
@@ -73,43 +67,66 @@ class _TrainingsPageState extends State<TrainingsPage> {
     return DateFormat('dd.MM.yyyy').format(date);
   }
 
-  Future<List<Map<String, dynamic>>> _getAllTrainings() async {
+  List<String> _generateMonthRange(DateTime start, DateTime end) {
+    List<String> months = [];
+    DateTime current = DateTime(start.year, start.month);
+
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      months.add(DateFormat('MM-yyyy').format(current));
+      current = DateTime(current.year, current.month + 1);
+    }
+
+    return months;
+  }
+
+  Future<List<Map<String, dynamic>>> _getAllTrainings(
+      String teamId, DateTime startDate, DateTime endDate) async {
     List<Map<String, dynamic>> allTrainings = [];
-
+    List<String> monthYears = _generateMonthRange(startDate, endDate);
     try {
-      QuerySnapshot trainingsSnapshot = await FirebaseFirestore.instance
-          .collection('Tim_Trening')
-          .where('Tim', isEqualTo: userTim)
-          .get();
+      for (String monthId in monthYears) {
+        CollectionReference monthCollectionRef = FirebaseFirestore.instance
+            .collection('Clanica_Tim_Trening_2')
+            .doc(teamId)
+            .collection(monthId);
 
-      for (var trainingDoc in trainingsSnapshot.docs) {
-        String status = trainingDoc['Status'];
-        String mjesto = trainingDoc['Mjesto'];
-        Timestamp start = trainingDoc['Početak'];
-        Timestamp end = trainingDoc['Kraj'];
+        QuerySnapshot trainingSnapshot = await monthCollectionRef.get();
 
-        allTrainings.add({
-          'DocId': trainingDoc.id,
-          'Početak': _formatTimeOnly(start),
-          'Kraj': _formatTimeOnly(end),
-          'Mjesto': mjesto,
-          'Status': status,
-          'Datum': _formatDateOnly(start),
-        });
+        for (var trainingDoc in trainingSnapshot.docs) {
+          Map<String, dynamic> trainingData =
+              trainingDoc.data() as Map<String, dynamic>;
+
+          Timestamp startTimestamp = trainingData['Početak'];
+          Timestamp endTimestamp = trainingData['Kraj'];
+
+          allTrainings.add({
+            'trainingId': trainingDoc.id,
+            'monthId': monthId,
+            'startTimestamp': startTimestamp,
+            'Početak': _formatTimeOnly(startTimestamp),
+            'Kraj': _formatTimeOnly(endTimestamp),
+            'Mjesto': trainingData['Mjesto'],
+            'Status': trainingData['Status'],
+            'Date': _formatDateOnly(startTimestamp),
+            'Tim': trainingData['Tim'],
+          });
+        }
       }
 
-      return allTrainings;
+      allTrainings.sort((a, b) {
+        return b['startTimestamp'].compareTo(a['startTimestamp']);
+      });
     } catch (e) {
-      print(e);
-      return [];
+      print('Error fetching trainings: $e');
     }
+
+    return allTrainings;
   }
 
   @override
   void initState() {
     super.initState();
     fetchUserTim();
-    _getAllTrainings();
   }
 
   Future<void> _openNewTrainigDialog(BuildContext context) async {
@@ -123,50 +140,92 @@ class _TrainingsPageState extends State<TrainingsPage> {
     );
   }
 
-  Future<void> _editTraining(BuildContext context, String id) async {
+  Future<void> _editTraining(BuildContext context, String teamName,
+      String monthYear, String id) async {
     return showDialog<void>(
-        context: context,
-        builder: (BuildContext context) {
-          return EditTrainingDialog(
-              docId: id,
-              onUpdate: (updatedData) {
-                setState(() {
-                  for (var training in trainingsData) {
-                    if (training['DocId'] == id) {
-                      training['Mjesto'] =
-                          updatedData['Mjesto'] ?? training['Mjesto'];
-                      if (training['Početak'] != null) {
-                        training['Početak'] =
-                            _formatDateOnly(updatedData['Početak']);
-                      }
-                      if (training['Kraj'] != null) {
-                        training['Kraj'] = _formatDateOnly(updatedData['Kraj']);
-                      }
-                    }
+      context: context,
+      builder: (BuildContext context) {
+        return EditTrainingDialog(
+          teamName: teamName,
+          monthYear: monthYear,
+          docId: id,
+          onUpdate: (updatedData) {
+            setState(() {
+              for (var training in trainingsData) {
+                if (training['DocId'] == id) {
+                  training['Mjesto'] =
+                      updatedData['Mjesto'] ?? training['Mjesto'];
+                  if (updatedData['Početak'] != null) {
+                    training['Početak'] =
+                        _formatDateOnly(updatedData['Početak']);
                   }
-                });
-              });
-        });
+                  if (updatedData['Kraj'] != null) {
+                    training['Kraj'] = _formatDateOnly(updatedData['Kraj']);
+                  }
+                }
+              }
+            });
+          },
+        );
+      },
+    );
   }
 
-  void trainingStart(String trainingId) async {
+  void deleteTraining(
+      String teamName, String monthYear, String trainingId) async {
+    try {
+      DocumentReference trainingRef = FirebaseFirestore.instance
+          .collection('Clanica_Tim_Trening_2')
+          .doc(teamName)
+          .collection(monthYear)
+          .doc(trainingId);
+
+      DocumentSnapshot trainingSnapshot = await trainingRef.get();
+      if (!trainingSnapshot.exists) {
+        throw Exception("Training document not found: ${trainingRef.path}");
+      }
+
+      QuerySnapshot membersSnapshot =
+          await trainingRef.collection('Members').get();
+      for (var doc in membersSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      await trainingRef.delete();
+
+      print("Training $trainingId deleted successfully!");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Training $trainingId deleted successfully!")),
+      );
+    } catch (e) {
+      print("Error deleting training: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error deleting training: $e")),
+      );
+    }
+  }
+
+  void trainingStart(
+      String teamName, String monthYear, String trainingId) async {
     Map<String, dynamic> updateData = {'Status': 'U tijeku'};
 
     await FirebaseFirestore.instance
-        .collection('Tim_Trening')
+        .collection('Clanica_Tim_Trening_2')
+        .doc(teamName)
+        .collection(monthYear)
         .doc(trainingId)
         .update(updateData);
 
     NfcManager.instance.startSession(onDiscovered: (NfcTag badge) async {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('NFC scanning started.')),
+        SnackBar(content: Text('NFC scanning started.')),
       );
 
-      _nfcStartSessionTimer = Timer(Duration(minutes: 1), () {
+      _nfcStartSessionTimer = Timer(Duration(seconds: 5), () {
         if (mounted) {
           NfcManager.instance.stopSession();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('NFC session automatically stopped.')),
+            SnackBar(content: Text('NFC session automatically stopped.')),
           );
         }
       });
@@ -181,8 +240,13 @@ class _TrainingsPageState extends State<TrainingsPage> {
             print("NFC tag data: $tagRecord");
           }
         }
+
         QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-            .collection('Clanica_Tim_Trening')
+            .collection('Clanica_Tim_Trening_2')
+            .doc(teamName)
+            .collection(monthYear)
+            .doc(trainingId)
+            .collection('Members')
             .where('ClanicaUID', isEqualTo: tagRecord)
             .where('Tim_TreningUID', isEqualTo: trainingId)
             .get();
@@ -190,7 +254,11 @@ class _TrainingsPageState extends State<TrainingsPage> {
         if (querySnapshot.docs.isNotEmpty) {
           var docId = querySnapshot.docs.first.id;
           await FirebaseFirestore.instance
-              .collection('Clanica_Tim_Trening')
+              .collection('Clanica_Tim_Trening_2')
+              .doc(teamName)
+              .collection(monthYear)
+              .doc(trainingId)
+              .collection('Members')
               .doc(docId)
               .update({'Dolazak': Timestamp.now(), 'Status': 'Prisutna'});
           print("Document updated: $docId");
@@ -203,83 +271,65 @@ class _TrainingsPageState extends State<TrainingsPage> {
         }
         NfcManager.instance.stopSession();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('NFC scanning stopped.')),
+          SnackBar(content: Text('NFC scanning stopped.')),
         );
       }
     });
   }
 
-  void trainingEnd(String trainingId) async {
+  void trainingEnd(String teamName, String monthYear, String trainingId) async {
     Map<String, dynamic> updateData = {'Status': 'Odrađen'};
 
-    await FirebaseFirestore.instance
-        .collection('Tim_Trening')
-        .doc(trainingId)
-        .update(updateData);
+    try {
+      DocumentReference trainingRef = FirebaseFirestore.instance
+          .collection('Clanica_Tim_Trening_2')
+          .doc(teamName)
+          .collection(monthYear)
+          .doc(trainingId);
+      await trainingRef.update(updateData);
+      QuerySnapshot membersSnapshot =
+          await trainingRef.collection('Members').get();
 
-    NfcManager.instance.startSession(onDiscovered: (NfcTag badge) async {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('NFC scanning started.')),
-      );
+      for (var doc in membersSnapshot.docs) {
+        var memberData = doc.data() as Map<String, dynamic>;
+        var docId = doc.id;
 
-      _nfcSessionTimer = Timer(Duration(minutes: 1), () {
-        if (mounted) {
-          NfcManager.instance.stopSession();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('NFC session automatically stopped.')),
-          );
+        if (memberData['Dolazak'] == null) {
+          await FirebaseFirestore.instance
+              .collection('Clanica_Tim_Trening_2')
+              .doc(teamName)
+              .collection(monthYear)
+              .doc(trainingId)
+              .collection('Members')
+              .doc(docId)
+              .update({
+            'Status': 'Odsutna',
+          });
+        } else {
+          await FirebaseFirestore.instance
+              .collection('Clanica_Tim_Trening_2')
+              .doc(teamName)
+              .collection(monthYear)
+              .doc(trainingId)
+              .collection('Members')
+              .doc(docId)
+              .update({
+            'Odlazak': Timestamp.now(),
+          });
+          print("Member $docId 'Odlazak' updated");
         }
-      });
-
-      try {
-        String tagRecord = "";
-        var ndef = Ndef.from(badge);
-        if (ndef != null && ndef.cachedMessage != null) {
-          for (var record in ndef.cachedMessage!.records) {
-            tagRecord =
-                "${String.fromCharCodes(record.payload.sublist(record.payload[0] + 1))}";
-            print("NFC tag data: $tagRecord");
-          }
-        }
-
-        QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-            .collection('Clanica_Tim_Trening')
-            .where('Tim_TreningUID', isEqualTo: trainingId)
-            .get();
-
-        for (var doc in querySnapshot.docs) {
-          var documentData = doc.data() as Map<String, dynamic>;
-          var docId = doc.id;
-
-          if (documentData['Dolazak'] == null) {
-            await FirebaseFirestore.instance
-                .collection('Clanica_Tim_Trening')
-                .doc(docId)
-                .update({
-              'Status': 'Odsutna',
-              'Odlazak': Timestamp.now(),
-            });
-            print("Document updated to 'Odsutna': $docId");
-          } else {
-            await FirebaseFirestore.instance
-                .collection('Clanica_Tim_Trening')
-                .doc(docId)
-                .update({'Odlazak': Timestamp.now()});
-            print("Document updated: $docId");
-          }
-        }
-      } catch (e) {
-        print('Error: $e');
-      } finally {
-        if (_nfcSessionTimer?.isActive ?? false) {
-          _nfcSessionTimer?.cancel();
-        }
-        NfcManager.instance.stopSession();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('NFC scanning stopped.')),
-        );
       }
-    });
+
+      NfcManager.instance.stopSession();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('NFC session stopped.')),
+      );
+    } catch (e) {
+      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   @override
@@ -292,48 +342,52 @@ class _TrainingsPageState extends State<TrainingsPage> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Map<String, dynamic>>>(
-        future: trainingsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return const Center(child: Text('Error loading trainings'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No trainings available'));
-          } else {
-            trainingsData = snapshot.data!;
+      future: trainingsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return const Center(child: Text('Error loading trainings'));
+        } else {
+          trainingsData = snapshot.data!;
 
-            return Scaffold(
-              body: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {
-                          _openNewTrainigDialog(context);
-                          _getAllTrainings();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8.0),
-                          decoration: BoxDecoration(
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(15.0)),
-                            color: Colors.white,
-                            border: Border.all(color: Colors.purple, width: 2),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.add, color: Colors.purple),
-                            ],
-                          ),
+          return Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      _openNewTrainigDialog(context);
+                      _getAllTrainings(userTim!, startDate, endDate);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8.0),
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(15.0)),
+                        color: Colors.white,
+                        border: Border.all(color: Colors.purple, width: 2),
+                      ),
+                      child: const Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add, color: Colors.purple),
+                            SizedBox(width: 8),
+                            Text('Novi trening',
+                                style: TextStyle(color: Colors.purple)),
+                          ],
                         ),
                       ),
                     ),
-                    Expanded(
-                        child: ListView.builder(
+                  ),
+                  const SizedBox(height: 10),
+                  trainingsData.isEmpty
+                      ? const Center(child: Text('No trainings available'))
+                      : Expanded(
+                          child: ListView.builder(
                             itemCount: trainingsData.length,
                             itemBuilder: (context, index) {
                               final training = trainingsData[index];
@@ -344,22 +398,26 @@ class _TrainingsPageState extends State<TrainingsPage> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('${training['Datum']}'),
+                                      Text('${training['Date']}'),
                                       PopupMenuButton<int>(
                                         icon: Icon(Icons.more_horiz),
                                         onSelected: (int value) {
+                                          final monthId = training['monthId'];
+                                          final trainingId =
+                                              training['trainingId'];
+
                                           if (value == 0) {
-                                            _editTraining(
-                                                context, training['DocId']);
+                                            _editTraining(context, userTim!,
+                                                monthId, trainingId);
                                           } else if (value == 1) {
-                                            FirebaseFirestore.instance
-                                                .collection('Tim_Trening')
-                                                .doc(training['DocId'])
-                                                .delete();
+                                            deleteTraining(
+                                                userTim!, monthId, trainingId);
                                           } else if (value == 2) {
-                                            trainingStart(training['DocId']);
+                                            trainingStart(
+                                                userTim!, monthId, trainingId);
                                           } else if (value == 3) {
-                                            trainingEnd(training['DocId']);
+                                            trainingEnd(
+                                                userTim!, monthId, trainingId);
                                           }
                                         },
                                         itemBuilder: (BuildContext context) {
@@ -369,9 +427,7 @@ class _TrainingsPageState extends State<TrainingsPage> {
                                               child: Row(
                                                 children: [
                                                   Icon(Icons.edit_outlined),
-                                                  SizedBox(
-                                                    width: 10,
-                                                  ),
+                                                  SizedBox(width: 10),
                                                   Text('Uredi')
                                                 ],
                                               ),
@@ -382,9 +438,7 @@ class _TrainingsPageState extends State<TrainingsPage> {
                                                 children: [
                                                   Icon(Icons
                                                       .delete_outline_rounded),
-                                                  SizedBox(
-                                                    width: 10,
-                                                  ),
+                                                  SizedBox(width: 10),
                                                   Text('Izbriši')
                                                 ],
                                               ),
@@ -394,9 +448,7 @@ class _TrainingsPageState extends State<TrainingsPage> {
                                               child: Row(
                                                 children: [
                                                   Icon(Icons.check_circle),
-                                                  SizedBox(
-                                                    width: 10,
-                                                  ),
+                                                  SizedBox(width: 10),
                                                   Text('Početak')
                                                 ],
                                               ),
@@ -406,9 +458,7 @@ class _TrainingsPageState extends State<TrainingsPage> {
                                               child: Row(
                                                 children: [
                                                   Icon(Icons.not_interested),
-                                                  SizedBox(
-                                                    width: 10,
-                                                  ),
+                                                  SizedBox(width: 10),
                                                   Text('Kraj')
                                                 ],
                                               ),
@@ -429,12 +479,15 @@ class _TrainingsPageState extends State<TrainingsPage> {
                                   ),
                                 ),
                               );
-                            }))
-                  ],
-                ),
+                            },
+                          ),
+                        ),
+                ],
               ),
-            );
-          }
-        });
+            ),
+          );
+        }
+      },
+    );
   }
 }

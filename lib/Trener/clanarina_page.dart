@@ -196,8 +196,10 @@ class _ClanarinaPageState extends State<ClanarinaPage> {
           );
         }
 
-        final clanarinasData =
-            snapshot.data?.where((doc) => doc['Uloga'] != 'Trener').toList();
+        final clanarinasData = snapshot.data
+            ?.where(
+                (doc) => doc['Uloga'] != 'Trener' && doc['Status'] != 'Ispis')
+            .toList();
 
         return DefaultTabController(
           length: clanarinasData!.length,

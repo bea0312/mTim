@@ -13,15 +13,16 @@ class DolasciPage extends StatefulWidget {
 class _DolasciPageState extends State<DolasciPage> {
   String? userTim;
   bool isLoading = true;
-  Map<String, List<Map<String, dynamic>>> memberTrainings = {};
   TextEditingController searchController = TextEditingController();
   String searchQuery = "";
+  List<String> availableMonths = [];
+  Map<String, List<Map<String, dynamic>>> monthlyTrainings = {};
 
   @override
   void initState() {
     super.initState();
     searchController.addListener(_onSearchChanged);
-    fetchUserTim();
+    fetchUserTim().then((_) => _fetchAvailableMonths());
   }
 
   Future<void> fetchUserTim() async {
@@ -37,64 +38,156 @@ class _DolasciPageState extends State<DolasciPage> {
           if (userDoc.docs.isNotEmpty) {
             final userData = userDoc.docs.first;
             if (userData['Uloga'] == 'Trener') {
-              if (mounted) {
-                setState(() {
-                  userTim = userData['Tim'];
-                });
-              }
+              setState(() {
+                userTim = userData['Tim'];
+              });
             }
           }
         }
       }
     } catch (e) {
       print('Error fetching user Tim: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
     }
   }
 
-  Stream<List<Map<String, dynamic>>> getMemberTrainingsStream(String memberId) {
+  Future<void> _fetchAvailableMonths() async {
+    DateTime now = DateTime.now();
+    DateTime startDate = DateTime(now.year, now.month - 12);
+    DateTime endDate = DateTime(now.year, now.month + 1);
+    List<String> monthRange = _generateMonthRange(startDate, endDate);
+    Set<String> monthsWithTrainings = {};
+
+    try {
+      CollectionReference teamCollectionRef =
+          FirebaseFirestore.instance.collection('Clanica_Tim_Trening_2');
+      QuerySnapshot teamSnapshot = await teamCollectionRef.get();
+
+      for (var teamDoc in teamSnapshot.docs) {
+        for (String monthId in monthRange) {
+          CollectionReference monthCollectionRef =
+              teamDoc.reference.collection(monthId);
+          QuerySnapshot trainingSnapshot =
+              await monthCollectionRef.limit(1).get();
+
+          if (trainingSnapshot.docs.isNotEmpty) {
+            monthsWithTrainings.add(monthId);
+          }
+        }
+      }
+
+      setState(() {
+        availableMonths = monthsWithTrainings.toList()
+          ..sort((a, b) => a.compareTo(b));
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching available months: $e');
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<String?> fetchMemberName(String memberId) async {
+    try {
+      final memberDoc = await FirebaseFirestore.instance
+          .collection('Clanica')
+          .doc(memberId)
+          .get();
+
+      if (memberDoc.exists) {
+        final memberData = memberDoc.data();
+        final status = memberData?['Status'];
+        final uloga = memberData?['Uloga'];
+
+        if (status == 'Upisana' && uloga == 'Plesač') {
+          final name = memberData?['Ime'] ?? 'Unknown';
+          final surname = memberData?['Prezime'] ?? 'Unknown';
+          return '$name $surname';
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching member name for $memberId: $e');
+      return null;
+    }
+  }
+
+  Stream<Map<String, Map<String, dynamic>>> getMemberTrainingsStream(
+      String monthId) {
     return FirebaseFirestore.instance
-        .collection('Clanica_Tim_Trening')
-        .where('ClanicaUID', isEqualTo: memberId)
+        .collection('Clanica_Tim_Trening_2')
+        .doc(userTim)
+        .collection(monthId)
         .snapshots()
         .asyncMap((snapshot) async {
-      List<Map<String, dynamic>> treningsData = [];
-      for (var doc in snapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        var timTreningId = data['Tim_TreningUID'];
+      Map<String, Map<String, dynamic>> memberTrainings = {};
 
-        DocumentSnapshot timTreningSnapshot = await FirebaseFirestore.instance
-            .collection('Tim_Trening')
-            .doc(timTreningId)
-            .get();
+      for (var trainingDoc in snapshot.docs) {
+        var trainingData = trainingDoc.data();
+        var membersCollection = trainingDoc.reference.collection('Members');
+        var memberSnapshot = await membersCollection.get();
 
-        if (!timTreningSnapshot.exists) continue;
+        for (var memberDoc in memberSnapshot.docs) {
+          var memberData = memberDoc.data();
+          var memberId = memberData['ClanicaUID'] ?? 'Unknown Member';
 
-        var timTreningData = timTreningSnapshot.data() as Map<String, dynamic>;
-        var pocetak = timTreningData['Početak'] as Timestamp?;
-        var status = timTreningData['Status'] as String?;
-        var mjesto = timTreningData['Mjesto'] as String?;
+          String? memberName = await fetchMemberName(memberId);
 
-        treningsData.add({
-          'DocId': doc.id,
-          'Dolazak': data['Dolazak'] != null
-              ? _formatTimestamp(data['Dolazak'])
-              : null,
-          'Odlazak': data['Odlazak'] != null
-              ? _formatTimestamp(data['Odlazak'])
-              : null,
-          'Status': status == 'U budućnosti' ? status : data['Status'],
-          'Mjesto': mjesto ?? 'N/A',
-          'Datum': pocetak != null ? _formatDateOnly(pocetak) : 'N/A',
-        });
+          if (memberName != null) {
+            var trainingDetails = {
+              'Dolazak': memberData['Dolazak'] != null
+                  ? _formatTimestamp(memberData['Dolazak'])
+                  : null,
+              'Odlazak': memberData['Odlazak'] != null
+                  ? _formatTimestamp(memberData['Odlazak'])
+                  : null,
+              'Status': memberData['Status'] ?? trainingData['Status'],
+              'StatusTrening': trainingData['Status'],
+              'Mjesto': trainingData['Mjesto'] ?? 'Unknown',
+              'Datum': trainingData['Početak'] != null
+                  ? _formatDateOnly(trainingData['Početak'])
+                  : 'N/A',
+            };
+
+            if (!memberTrainings.containsKey(memberId)) {
+              memberTrainings[memberId] = {
+                'trainings': [],
+                'presentCount': 0,
+              };
+            }
+            (memberTrainings[memberId]!['trainings'] as List)
+                .add(trainingDetails);
+
+            if (trainingDetails['Status'] == 'Prisutna') {
+              memberTrainings[memberId]!['presentCount'] =
+                  memberTrainings[memberId]!['presentCount'] + 1;
+            }
+          }
+        }
       }
-      return treningsData;
+
+      memberTrainings.forEach((key, value) {
+        int totalTrainings = (value['trainings'] as List).length;
+        int presentCount = value['presentCount'];
+        double attendancePercentage =
+            totalTrainings > 0 ? (presentCount / totalTrainings) * 100 : 0.0;
+        value['attendancePercentage'] = attendancePercentage;
+      });
+
+      return memberTrainings;
     });
+  }
+
+  List<String> _generateMonthRange(DateTime start, DateTime end) {
+    List<String> months = [];
+    DateTime current = DateTime(start.year, start.month);
+
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      months.add(DateFormat('MM-yyyy').format(current));
+      current = DateTime(current.year, current.month + 1);
+    }
+    return months;
   }
 
   String _formatTimestamp(Timestamp timestamp) {
@@ -105,15 +198,6 @@ class _DolasciPageState extends State<DolasciPage> {
   String _formatDateOnly(Timestamp timestamp) {
     DateTime date = timestamp.toDate();
     return DateFormat('dd.MM.yyyy').format(date);
-  }
-
-  double _calculateAttendancePercentage(List<Map<String, dynamic>> trainings) {
-    if (trainings.isEmpty) {
-      return 0.0;
-    }
-    int attendedCount =
-        trainings.where((trening) => trening['Status'] == 'Prisutna').length;
-    return (attendedCount / trainings.length) * 100;
   }
 
   void _onSearchChanged() {
@@ -127,157 +211,106 @@ class _DolasciPageState extends State<DolasciPage> {
     return Scaffold(
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: searchController,
-              decoration: InputDecoration(
-                hintText: 'Upiši ime ili prezime...',
-                hintStyle: TextStyle(color: Colors.purple[100]),
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(15.0),
-                ),
-              ),
-            ),
-          ),
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('Clanica')
-                    .where('Tim', isEqualTo: userTim)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+            child: ListView.builder(
+              itemCount: availableMonths.length,
+              itemBuilder: (context, index) {
+                final monthId = availableMonths[index];
 
-                  if (snapshot.hasError) {
-                    return const Center(child: Text('Error loading members.'));
-                  }
+                return StreamBuilder<Map<String, Map<String, dynamic>>>(
+                  stream: getMemberTrainingsStream(monthId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return CircularProgressIndicator();
+                    }
 
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text('No members found.'));
-                  }
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return ListTile(title: Text('No trainings available'));
+                    }
 
-                  final filteredDocs = snapshot.data?.docs
-                      .where((doc) => doc['Uloga'] != 'Trener')
-                      .toList();
-                  final members = filteredDocs?.where((member) {
-                    final memberData = member.data() as Map<String, dynamic>;
-                    final ime = memberData['Ime'].toLowerCase();
-                    final prezime = memberData['Prezime'].toLowerCase();
-                    return ime.contains(searchQuery) ||
-                        prezime.contains(searchQuery);
-                  }).toList();
+                    final memberTrainings = snapshot.data ?? {};
 
-                  return ListView.builder(
-                    itemCount: members?.length,
-                    itemBuilder: (context, index) {
-                      final memberDoc = members?[index];
-                      final memberData =
-                          memberDoc?.data() as Map<String, dynamic>;
-                      final memberId = memberDoc!.id;
+                    return Container(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Container(
+                          alignment: Alignment.centerLeft,
+                          decoration: BoxDecoration(
+                            color: Colors.purple[100],
+                            borderRadius:
+                                const BorderRadius.all(Radius.circular(15.0)),
+                          ),
+                          child: ExpansionTile(
+                            title: Text(
+                              monthId,
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            children: memberTrainings.entries.map((entry) {
+                              final memberId = entry.key;
+                              final trainingData = entry.value;
+                              final trainings =
+                                  trainingData['trainings'] as List;
+                              final attendancePercentage =
+                                  trainingData['attendancePercentage']
+                                      as double;
 
-                      return StreamBuilder<List<Map<String, dynamic>>>(
-                        stream: getMemberTrainingsStream(memberId),
-                        builder: (context, trainingSnapshot) {
-                          if (trainingSnapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return ListTile(
-                                title: Text(
-                                    '${memberData['Ime']} ${memberData['Prezime']}'),
-                                subtitle: const Text('Loading...'));
-                          }
+                              return FutureBuilder<String?>(
+                                future: fetchMemberName(memberId),
+                                builder: (context, memberNameSnapshot) {
+                                  final memberName = memberNameSnapshot.data;
+                                  if (memberName == null) {
+                                    return SizedBox.shrink();
+                                  }
 
-                          if (trainingSnapshot.hasError) {
-                            return ListTile(
-                                title: Text(
-                                    '${memberData['Ime']} ${memberData['Prezime']}'),
-                                subtitle:
-                                    const Text('Error loading training data.'));
-                          }
-
-                          final trainings = trainingSnapshot.data ?? [];
-
-                          double attendancePercentage =
-                              _calculateAttendancePercentage(trainings);
-
-                          return Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Container(
-                              alignment: Alignment.centerLeft,
-                              decoration: BoxDecoration(
-                                color: Colors.purple[100],
-                                borderRadius: const BorderRadius.all(
-                                    Radius.circular(15.0)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ExpansionTile(
+                                  return ExpansionTile(
                                     title: Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
                                       children: [
+                                        Text(memberName),
                                         Text(
-                                            '${memberData['Ime']} ${memberData['Prezime']}'),
-                                        Text(
-                                          '${attendancePercentage.toStringAsFixed(1)}%',
+                                          '${attendancePercentage.toStringAsFixed(2)}%',
                                           style: TextStyle(
                                             color: attendancePercentage >= 60
                                                 ? Colors.green
                                                 : Colors.red,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 15,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    children: trainings.isNotEmpty
-                                        ? trainings.map((trening) {
-                                            return ListTile(
-                                              title:
-                                                  Text('${trening['Datum']}'),
-                                              subtitle: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                      '${trening['Status'] ?? ''}'),
-                                                  if (trening['Dolazak'] !=
-                                                          null &&
-                                                      trening['Dolazak']!
-                                                          .isNotEmpty)
-                                                    Text(
-                                                        'Dolazak: ${trening['Dolazak']}'),
-                                                  if (trening['Odlazak'] !=
-                                                          null &&
-                                                      trening['Odlazak']!
-                                                          .isNotEmpty)
-                                                    Text(
-                                                        'Odlazak: ${trening['Odlazak']}'),
-                                                ],
-                                              ),
-                                            );
-                                          }).toList()
-                                        : [
-                                            const ListTile(
-                                                title: Text('Nema podataka'))
+                                    children: trainings.map((training) {
+                                      return ListTile(
+                                        title: Text(
+                                            '${training['Datum']} - ${training['Mjesto']}'),
+                                        subtitle: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Status: ${training['Status']}',
+                                            ),
+                                            if (training['Dolazak'] != null)
+                                              Text(
+                                                  'Dolazak: ${training['Dolazak']}'),
+                                            if (training['Odlazak'] != null)
+                                              Text(
+                                                  'Odlazak: ${training['Odlazak']}'),
                                           ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                }),
-          )
+                                        ),
+                                      );
+                                    }).toList(),
+                                  );
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ));
+                  },
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

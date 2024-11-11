@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:mtim/firebase_api.dart';
 
 class AddNewTrainingDialog extends StatefulWidget {
   final String? team;
@@ -19,6 +18,15 @@ class _AddNewTrainingDialogState extends State<AddNewTrainingDialog> {
   String? trainingID;
 
   Future<void> saveTrainingToFirestore() async {
+    // Ensure 'start' and 'end' are not null
+    if (start == null || end == null) {
+      // Handle the case where the start or end time is not set
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select both start and end time')),
+      );
+      return;
+    }
+
     final newTraining = {
       'Početak': start,
       'Kraj': end,
@@ -27,25 +35,56 @@ class _AddNewTrainingDialogState extends State<AddNewTrainingDialog> {
       'Status': 'U budućnosti'
     };
 
-    DocumentReference trainingRef = await FirebaseFirestore.instance
-        .collection('Tim_Trening')
-        .add(newTraining);
-    Navigator.of(context).pop();
+    String monthYear = DateFormat('MM-yyyy').format(start!);
+    print('Month-Year: $monthYear'); // Log for debugging
 
-    trainingID = trainingRef.id;
+    // Ensure the team document exists
+    DocumentReference teamDocRef = FirebaseFirestore.instance
+        .collection('Clanica_Tim_Trening_2')
+        .doc(widget.team);
 
-    QuerySnapshot membersSnapshot = await FirebaseFirestore.instance
-        .collection('Clanica')
-        .where('Tim', isEqualTo: widget.team)
-        .get();
+    DocumentSnapshot teamSnapshot = await teamDocRef.get();
+    if (!teamSnapshot.exists) {
+      await teamDocRef.set({'name': widget.team});
+    }
 
-    for (var memberDoc in membersSnapshot.docs) {
-      memberId = memberDoc.id;
+    // Creating the collection reference for the specific month-year
+    try {
+      CollectionReference monthCollectionRef = teamDocRef.collection(monthYear);
 
-      final data = {'ClanicaUID': memberId, 'Tim_TreningUID': trainingID};
-      await FirebaseFirestore.instance
-          .collection('Clanica_Tim_Trening')
-          .add(data);
+      // Add new training document
+      DocumentReference trainingRef = await monthCollectionRef.add(newTraining);
+      trainingID = trainingRef.id;
+
+      // Get members of the team
+      QuerySnapshot membersSnapshot = await FirebaseFirestore.instance
+          .collection('Clanica')
+          .where('Tim', isEqualTo: widget.team)
+          .get();
+
+      // Add links between the members and the training
+      for (var memberDoc in membersSnapshot.docs) {
+        memberId = memberDoc.id;
+
+        final memberTrainingLink = {
+          'ClanicaUID': memberId,
+          'Tim_TreningUID': trainingID
+        };
+        await monthCollectionRef
+            .doc(trainingID)
+            .collection('Members')
+            .doc(memberId)
+            .set(memberTrainingLink);
+      }
+
+      // Successfully saved the training
+      Navigator.of(context).pop();
+    } catch (e) {
+      // Catch any errors during the Firestore operation
+      print('Error saving training to Firestore: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save training')),
+      );
     }
   }
 
@@ -63,129 +102,132 @@ class _AddNewTrainingDialogState extends State<AddNewTrainingDialog> {
               height: 15,
             ),
             Expanded(
-                child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  ListTile(
-                    title: Text(start == null
-                        ? 'Početak treninga'
-                        : 'Početak: ${DateFormat('dd.MM.yyyy HH:mm').format(start!)}'),
-                    trailing: const Icon(Icons.calendar_today),
-                    onTap: () async {
-                      final DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          firstDate: DateTime(2023),
-                          lastDate: DateTime(2100));
-                      if (pickedDate != null) {
-                        final TimeOfDay? pickedTime = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.fromDateTime(DateTime.now()),
-                        );
-                        if (pickedTime != null) {
-                          setState(() {
-                            start = DateTime(
-                                pickedDate.year,
-                                pickedDate.month,
-                                pickedDate.day,
-                                pickedTime.hour,
-                                pickedTime.minute);
-                          });
-                        }
-                      }
-                    },
-                  ),
-                  ListTile(
-                    title: Text(end == null
-                        ? 'Završetak treninga'
-                        : 'Kraj: ${DateFormat('dd.MM.yyyy HH:mm').format(end!)}'),
-                    trailing: const Icon(Icons.calendar_today),
-                    onTap: () async {
-                      final DateTime? pickedDate = await showDatePicker(
-                          context: context,
-                          firstDate: DateTime(2023),
-                          lastDate: DateTime(2100));
-                      if (pickedDate != null) {
-                        final TimeOfDay? pickedTime = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.fromDateTime(DateTime.now()),
-                        );
-                        if (pickedTime != null) {
-                          setState(() {
-                            end = DateTime(
-                                pickedDate.year,
-                                pickedDate.month,
-                                pickedDate.day,
-                                pickedTime.hour,
-                                pickedTime.minute);
-                          });
-                        }
-                      }
-                    },
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 5),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DropdownButton<String>(
-                        value: dropdownValue,
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            dropdownValue = newValue!;
-                          });
-                        },
-                        items: <String>[
-                          'OŠ Ljubo Babić - dvorana',
-                          'OŠ Ljubo Babić - igralište',
-                          'Centar za kulturu',
-                          'Kino',
-                          'SŠ Jastrebarsko - velika dvorana',
-                          'SŠ Jastrebarsko - mala dvorana'
-                        ].map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    ListTile(
+                      title: Text(start == null
+                          ? 'Početak treninga'
+                          : 'Početak: ${DateFormat('dd.MM.yyyy HH:mm').format(start!)}'),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final DateTime? pickedDate = await showDatePicker(
+                            context: context,
+                            firstDate: DateTime(2023),
+                            lastDate: DateTime(2100),
+                            initialDate: DateTime.now());
+                        if (pickedDate != null) {
+                          final TimeOfDay? pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
                           );
-                        }).toList(),
+                          if (pickedTime != null) {
+                            setState(() {
+                              start = DateTime(
+                                  pickedDate.year,
+                                  pickedDate.month,
+                                  pickedDate.day,
+                                  pickedTime.hour,
+                                  pickedTime.minute);
+                            });
+                          }
+                        }
+                      },
+                    ),
+                    ListTile(
+                      title: Text(end == null
+                          ? 'Završetak treninga'
+                          : 'Kraj: ${DateFormat('dd.MM.yyyy HH:mm').format(end!)}'),
+                      trailing: const Icon(Icons.calendar_today),
+                      onTap: () async {
+                        final DateTime? pickedDate = await showDatePicker(
+                            context: context,
+                            firstDate: DateTime(2023),
+                            lastDate: DateTime(2100),
+                            initialDate: DateTime.now());
+                        if (pickedDate != null) {
+                          final TimeOfDay? pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (pickedTime != null) {
+                            setState(() {
+                              end = DateTime(
+                                  pickedDate.year,
+                                  pickedDate.month,
+                                  pickedDate.day,
+                                  pickedTime.hour,
+                                  pickedTime.minute);
+                            });
+                          }
+                        }
+                      },
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DropdownButton<String>(
+                          value: dropdownValue,
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              dropdownValue = newValue!;
+                            });
+                          },
+                          items: <String>[
+                            'OŠ Ljubo Babić - dvorana',
+                            'OŠ Ljubo Babić - igralište',
+                            'Centar za kulturu',
+                            'Kino',
+                            'SŠ Jastrebarsko - velika dvorana',
+                            'SŠ Jastrebarsko - mala dvorana'
+                          ].map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                  ),
-                  GestureDetector(
-                    onTap: () async {
-                      await saveTrainingToFirestore();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(15.0),
-                      decoration: BoxDecoration(
-                        borderRadius:
-                            const BorderRadius.all(Radius.circular(15.0)),
-                        color: Colors.purple,
-                        border: Border.all(color: Colors.purple, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.5),
-                            spreadRadius: 5,
-                            blurRadius: 7,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check, color: Colors.white),
-                          Text(
-                            'Dodaj trening',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                    GestureDetector(
+                      onTap: () async {
+                        await saveTrainingToFirestore();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(15.0),
+                        decoration: BoxDecoration(
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(15.0)),
+                          color: Colors.purple,
+                          border: Border.all(color: Colors.purple, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.5),
+                              spreadRadius: 5,
+                              blurRadius: 7,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check, color: Colors.white),
+                            Text(
+                              'Dodaj trening',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ))
+            )
           ],
         ),
       ),

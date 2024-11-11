@@ -51,7 +51,7 @@ class _AddNewMemberDialogState extends State<AddNewMemberDialog> {
       'Datum rođenja': datumRodenjaController.text,
       'Adresa': adresaController.text,
       'Email': mailController.text,
-      'Broj mobitelja roditelja': mobRoditeljaController.text,
+      'Broj mobitela roditelja': mobRoditeljaController.text,
       'Broj mobitela članice': mobClaniceController.text,
       'CijenaClanarine': cijenaClanarineController.text,
       'Dobni razred': dropdownValue,

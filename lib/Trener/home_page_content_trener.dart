@@ -59,6 +59,18 @@ class _HomePageContentState extends State<HomePageContent> {
     });
   }
 
+  String normalizeCroatianString(String input) {
+    return input
+        .replaceAll('Ć', 'D')
+        .replaceAll('Đ', 'D')
+        .replaceAll('Ž', 'Z')
+        .replaceAll('Š', 'S')
+        .replaceAll('Č', 'C')
+        .replaceAll('LJ', 'Lj')
+        .replaceAll('NJ', 'Nj')
+        .toLowerCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,6 +108,13 @@ class _HomePageContentState extends State<HomePageContent> {
                                       doc['Uloga'] != 'Trener' &&
                                       doc['Status'] != 'Ispis')
                                   .toList();
+                              filteredDocs?.sort((a, b) {
+                                final aPrezime =
+                                    normalizeCroatianString(a['Prezime'] ?? '');
+                                final bPrezime =
+                                    normalizeCroatianString(b['Prezime'] ?? '');
+                                return aPrezime.compareTo(bPrezime);
+                              });
 
                               final members = filteredDocs?.where((member) {
                                 final memberData =
@@ -107,13 +126,19 @@ class _HomePageContentState extends State<HomePageContent> {
                                     prezime.contains(searchQuery);
                               }).toList();
 
+                              if (members == null || members.isEmpty) {
+                                return const Center(
+                                  child: Text('No members found.'),
+                                );
+                              }
+
                               return ListView.builder(
-                                itemCount: members?.length,
+                                itemCount: members.length,
                                 itemBuilder: (context, index) {
-                                  final member = members?[index];
+                                  final member = members[index];
                                   final memberData =
-                                      member?.data() as Map<String, dynamic>;
-                                  final docId = member?.id;
+                                      member.data() as Map<String, dynamic>;
+                                  final docId = member.id;
                                   final godinaPreregistracije =
                                       memberData['Godina preregistracije'];
                                   bool isCurrentYearWarning = false;
@@ -134,7 +159,7 @@ class _HomePageContentState extends State<HomePageContent> {
                                         MaterialPageRoute(
                                           builder: (context) => MemberInfoPage(
                                             memberData: memberData,
-                                            docId: docId!,
+                                            docId: docId,
                                           ),
                                         ),
                                       );

@@ -3,14 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class EditTrainingDialog extends StatefulWidget {
+  final String teamName;
+  final String monthYear;
   final String docId;
   final Function(Map<String, dynamic>) onUpdate;
 
   const EditTrainingDialog({
-    super.key,
+    Key? key,
+    required this.teamName,
+    required this.monthYear,
     required this.docId,
     required this.onUpdate,
-  });
+  }) : super(key: key);
 
   @override
   State<EditTrainingDialog> createState() => _EditTrainingDialogState();
@@ -29,8 +33,11 @@ class _EditTrainingDialogState extends State<EditTrainingDialog> {
 
   Future<void> _fetchExistingData() async {
     try {
+      // Update path to include teamName and monthYear
       DocumentSnapshot docSnapshot = await FirebaseFirestore.instance
-          .collection('Tim_Trening')
+          .collection('Clanica_Tim_Trening_2')
+          .doc(widget.teamName)
+          .collection(widget.monthYear)
           .doc(widget.docId)
           .get();
 
@@ -170,8 +177,11 @@ class _EditTrainingDialogState extends State<EditTrainingDialog> {
                     updateData['Kraj'] = Timestamp.fromDate(end!);
                   }
 
+                  // Update path to include teamName and monthYear
                   await FirebaseFirestore.instance
-                      .collection('Tim_Trening')
+                      .collection('Clanica_Tim_Trening_2')
+                      .doc(widget.teamName)
+                      .collection(widget.monthYear)
                       .doc(widget.docId)
                       .update(updateData);
 

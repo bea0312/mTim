@@ -3,9 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class AddStatusDialog extends StatefulWidget {
-  final String docId;
+  final String memberId;
+  final String teamId;
+  final String trainingId;
+  final String monthYear;
 
-  const AddStatusDialog({super.key, required this.docId});
+  const AddStatusDialog({
+    super.key,
+    required this.memberId,
+    required this.teamId,
+    required this.trainingId,
+    required this.monthYear,
+  });
 
   @override
   State<AddStatusDialog> createState() => _AddStatusDialogState();
@@ -18,6 +27,8 @@ class _AddStatusDialogState extends State<AddStatusDialog> {
 
   @override
   Widget build(BuildContext context) {
+    print('Member ID: ${widget.memberId}');
+
     return StatefulBuilder(
       builder: (context, setState) {
         return AlertDialog(
@@ -117,18 +128,41 @@ class _AddStatusDialogState extends State<AddStatusDialog> {
               child: Text('Add'),
               onPressed: () async {
                 if (dropdownValue.isNotEmpty) {
-                  Map<String, dynamic> updateData = {'Status': dropdownValue};
+                  Map<String, dynamic> updateData = {
+                    'Status': dropdownValue,
+                  };
                   if (dropdownValue == 'Prisutna' &&
                       dolazakTime != null &&
                       odlazakTime != null) {
                     updateData['Dolazak'] = Timestamp.fromDate(dolazakTime!);
                     updateData['Odlazak'] = Timestamp.fromDate(odlazakTime!);
                   }
-                  await FirebaseFirestore.instance
-                      .collection('Clanica_Tim_Trening')
-                      .doc(widget.docId)
-                      .update(updateData);
-                  Navigator.of(context).pop();
+
+                  try {
+                    DocumentReference memberDocRef = FirebaseFirestore.instance
+                        .collection('Clanica_Tim_Trening_2')
+                        .doc(widget.teamId)
+                        .collection(widget.monthYear)
+                        .doc(widget.trainingId)
+                        .collection('Members')
+                        .doc(widget.memberId);
+
+                    DocumentSnapshot memberDoc = await memberDocRef.get();
+
+                    if (memberDoc.exists) {
+                      await memberDocRef.set(
+                          updateData, SetOptions(merge: true));
+                      print('Updated member document: ${widget.memberId}');
+                      Navigator.of(context).pop();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Member not found.')));
+                    }
+                  } catch (e) {
+                    print('Error updating status: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error updating status.')));
+                  }
                 }
               },
             ),

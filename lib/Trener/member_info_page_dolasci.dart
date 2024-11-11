@@ -13,94 +13,232 @@ class MemberInfoPageDolasci extends StatefulWidget {
 }
 
 class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
-  //List<Map<String, dynamic>> trenings = [];
-  Map<String, List<Map<String, dynamic>>> memberTrainings = {};
   Map<String, List<Map<String, dynamic>>> monthlyTrainings = {};
+  List<String> availableMonths = [];
+  bool isLoading = true;
+  String teamId = '';
+  String currentMonth = DateFormat('MM-yyyy').format(DateTime.now());
 
   @override
   void initState() {
     super.initState();
-    _getAllTrenings();
-    _calculateAttendancePercentage(widget.docId);
+    _fetchAvailableMonths();
+    _getTrainingsForCurrentMonth();
   }
 
-  Future<void> _getAllTrenings() async {
+  Future<void> _fetchAvailableMonths() async {
+    DateTime now = DateTime.now();
+    DateTime startDate = DateTime(now.year, now.month - 12);
+    DateTime endDate = DateTime(now.year, now.month + 1);
+    List<String> monthRange = _generateMonthRange(startDate, endDate);
+
+    Set<String> monthsWithTrainings = {};
+
     try {
-      print('Fetching trainings for member: ${widget.docId}');
+      CollectionReference teamCollectionRef =
+          FirebaseFirestore.instance.collection('Clanica_Tim_Trening_2');
+      QuerySnapshot teamSnapshot = await teamCollectionRef.get();
 
-      QuerySnapshot clanicaTimTreningSnapshot = await FirebaseFirestore.instance
-          .collection('Clanica_Tim_Trening')
-          .where('ClanicaUID', isEqualTo: widget.docId)
-          .get();
+      for (var teamDoc in teamSnapshot.docs) {
+        teamId = teamDoc.id;
 
-      if (clanicaTimTreningSnapshot.docs.isEmpty) {
-        print('No documents found for ClanicaUID: ${widget.docId}');
-        return;
-      }
+        for (String monthId in monthRange) {
+          CollectionReference monthCollectionRef =
+              teamDoc.reference.collection(monthId);
+          QuerySnapshot trainingSnapshot =
+              await monthCollectionRef.limit(1).get();
 
-      List<Map<String, dynamic>> treningsData = [];
-      Map<String, List<Map<String, dynamic>>> groupedTrainings = {};
-
-      for (var doc in clanicaTimTreningSnapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        var timTreningId = data['Tim_TreningUID'];
-        print('Fetching Tim_Trening for ID: $timTreningId');
-
-        DocumentSnapshot timTreningSnapshot = await FirebaseFirestore.instance
-            .collection('Tim_Trening')
-            .doc(timTreningId)
-            .get();
-
-        if (!timTreningSnapshot.exists) {
-          print('No Tim_Trening document found with ID: $timTreningId');
-          continue;
+          if (trainingSnapshot.docs.isNotEmpty) {
+            print("Found trainings for month: $monthId");
+            monthsWithTrainings.add(monthId);
+          }
         }
-
-        var timTreningData = timTreningSnapshot.data() as Map<String, dynamic>;
-        Timestamp? pocetak = timTreningData['Početak'];
-        Timestamp? kraj = timTreningData['Kraj'];
-        String mjesto = timTreningData['Mjesto'];
-        String status = timTreningData['Status'];
-        String monthKey = DateFormat('MM/yyyy').format(pocetak!.toDate());
-
-        var trening = {
-          'DocId': doc.id,
-          'Dolazak': data['Dolazak'] != null
-              ? _formatTimestamp(data['Dolazak'])
-              : null,
-          'Odlazak': data['Odlazak'] != null
-              ? _formatTimestamp(data['Odlazak'])
-              : null,
-          'Status': data.containsKey('Status') ? data['Status'] : null,
-          'Datum': pocetak != null ? _formatDateOnly(pocetak) : 'N/A',
-          'Početak': pocetak != null ? _formatTimestamp(pocetak) : 'N/A',
-          'Kraj': kraj != null ? _formatTimestamp(kraj) : 'N/A',
-          'Mjesto': mjesto,
-          'TrainingStatus': status,
-        };
-
-        treningsData.add(trening);
-
-        if (!groupedTrainings.containsKey(monthKey)) {
-          groupedTrainings[monthKey] = [];
-        }
-        groupedTrainings[monthKey]?.add(trening);
       }
 
       setState(() {
-        memberTrainings[widget.docId] = treningsData;
-        monthlyTrainings = groupedTrainings;
+        availableMonths = monthsWithTrainings.toList()
+          ..sort((a, b) => a.compareTo(b));
+        isLoading = false;
       });
-
-      print('Trainings set in state: ${memberTrainings[widget.docId]}');
     } catch (e) {
-      print('Error retrieving trainings: $e');
+      print('Error fetching available months: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
-  String _formatTimestamp(Timestamp timestamp) {
+  Future<void> _getTrainingsForMonth(String monthId) async {
+    if (monthlyTrainings.containsKey(monthId)) return;
+
+    setState(() {
+      isLoading = true;
+    });
+
+    List<Map<String, dynamic>> monthTrainings = [];
+    try {
+      CollectionReference teamCollectionRef =
+          FirebaseFirestore.instance.collection('Clanica_Tim_Trening_2');
+      QuerySnapshot teamSnapshot = await teamCollectionRef.get();
+
+      for (var teamDoc in teamSnapshot.docs) {
+        CollectionReference monthCollectionRef =
+            teamDoc.reference.collection(monthId);
+        QuerySnapshot trainingSnapshot = await monthCollectionRef.get();
+
+        if (trainingSnapshot.docs.isNotEmpty) {
+          for (var trainingDoc in trainingSnapshot.docs) {
+            CollectionReference membersCollectionRef =
+                trainingDoc.reference.collection('Members');
+            QuerySnapshot membersSnapshot = await membersCollectionRef
+                .where('ClanicaUID', isEqualTo: widget.docId)
+                .get();
+
+            if (membersSnapshot.docs.isNotEmpty) {
+              Map<String, dynamic> trainingData =
+                  trainingDoc.data() as Map<String, dynamic>;
+              Timestamp startTimestamp =
+                  trainingData['Početak'] ?? Timestamp.now();
+              Timestamp endTimestamp = trainingData['Kraj'] ?? Timestamp.now();
+
+              DocumentSnapshot memberDoc = await FirebaseFirestore.instance
+                  .collection('Clanica_Tim_Trening_2')
+                  .doc(teamId)
+                  .collection(monthId)
+                  .doc(trainingDoc.id)
+                  .collection('Members')
+                  .doc(widget.docId)
+                  .get();
+              Map<String, dynamic>? memberData =
+                  memberDoc.data() as Map<String, dynamic>?;
+
+              var trening = {
+                'trainingId': trainingDoc.id,
+                'monthId': monthId,
+                'startTimestamp': startTimestamp,
+                'Početak': _formatTimeOnly(startTimestamp),
+                'Kraj': _formatTimeOnly(endTimestamp),
+                'Mjesto': trainingData['Mjesto'] ?? 'Unknown',
+                'Status': memberData != null && memberData.containsKey('Status')
+                    ? memberData['Status']
+                    : 'Unknown',
+                'Dolazak':
+                    memberData != null && memberData.containsKey('Dolazak')
+                        ? _formatTimeOnly(memberData['Dolazak'])
+                        : '',
+                'Odlazak':
+                    memberData != null && memberData.containsKey('Odlazak')
+                        ? _formatTimeOnly(memberData['Odlazak'])
+                        : '',
+                'Datum': _formatDateOnly(startTimestamp),
+                'Tim': trainingData['Tim'] ?? 'Unknown',
+              };
+
+              monthTrainings.add(trening);
+            }
+          }
+        }
+      }
+
+      monthTrainings
+          .sort((a, b) => b['startTimestamp'].compareTo(a['startTimestamp']));
+
+      setState(() {
+        monthlyTrainings[monthId] = monthTrainings;
+      });
+    } catch (e) {
+      print('Error fetching trainings for $monthId: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _getTrainingsForCurrentMonth() async {
+    List<Map<String, dynamic>> monthTrainings = [];
+    try {
+      CollectionReference teamCollectionRef =
+          FirebaseFirestore.instance.collection('Clanica_Tim_Trening_2');
+      QuerySnapshot teamSnapshot = await teamCollectionRef.get();
+
+      for (var teamDoc in teamSnapshot.docs) {
+        CollectionReference monthCollectionRef =
+            teamDoc.reference.collection(currentMonth);
+        QuerySnapshot trainingSnapshot = await monthCollectionRef.get();
+
+        if (trainingSnapshot.docs.isNotEmpty) {
+          for (var trainingDoc in trainingSnapshot.docs) {
+            CollectionReference membersCollectionRef =
+                trainingDoc.reference.collection('Members');
+            QuerySnapshot membersSnapshot = await membersCollectionRef
+                .where('ClanicaUID', isEqualTo: widget.docId)
+                .get();
+
+            if (membersSnapshot.docs.isNotEmpty) {
+              Map<String, dynamic> trainingData =
+                  trainingDoc.data() as Map<String, dynamic>;
+              Timestamp startTimestamp =
+                  trainingData['Početak'] ?? Timestamp.now();
+              Timestamp endTimestamp = trainingData['Kraj'] ?? Timestamp.now();
+
+              DocumentSnapshot memberDoc = await FirebaseFirestore.instance
+                  .collection('Clanica_Tim_Trening_2')
+                  .doc(teamId)
+                  .collection(currentMonth)
+                  .doc(trainingDoc.id)
+                  .collection('Members')
+                  .doc(widget.docId)
+                  .get();
+              Map<String, dynamic>? memberData =
+                  memberDoc.data() as Map<String, dynamic>?;
+
+              var trening = {
+                'trainingId': trainingDoc.id,
+                'monthId': currentMonth,
+                'startTimestamp': startTimestamp,
+                'Početak': _formatTimeOnly(startTimestamp),
+                'Kraj': _formatTimeOnly(endTimestamp),
+                'Mjesto': trainingData['Mjesto'] ?? 'Unknown',
+                'Status': memberData != null && memberData.containsKey('Status')
+                    ? memberData['Status']
+                    : 'Unknown',
+                'Dolazak':
+                    memberData != null && memberData.containsKey('Dolazak')
+                        ? _formatTimeOnly(memberData['Dolazak'])
+                        : '',
+                'Odlazak':
+                    memberData != null && memberData.containsKey('Odlazak')
+                        ? _formatTimeOnly(memberData['Odlazak'])
+                        : '',
+                'Datum': _formatDateOnly(startTimestamp),
+                'Tim': trainingData['Tim'] ?? 'Unknown',
+              };
+
+              monthTrainings.add(trening);
+            }
+          }
+        }
+      }
+
+      monthTrainings
+          .sort((a, b) => b['startTimestamp'].compareTo(a['startTimestamp']));
+
+      setState(() {
+        monthlyTrainings[currentMonth] = monthTrainings;
+      });
+    } catch (e) {
+      print('Error fetching trainings for current month: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  String _formatTimeOnly(Timestamp timestamp) {
     DateTime date = timestamp.toDate();
-    return DateFormat('dd.MM.yyyy HH:mm').format(date);
+    return DateFormat('HH:mm').format(date);
   }
 
   String _formatDateOnly(Timestamp timestamp) {
@@ -108,35 +246,57 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
     return DateFormat('dd.MM.yyyy').format(date);
   }
 
-  Future<void> _showAddStatusDialog(BuildContext context, String docId) async {
+  List<String> _generateMonthRange(DateTime start, DateTime end) {
+    List<String> months = [];
+    DateTime current = DateTime(start.year, start.month);
+
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      months.add(DateFormat('MM-yyyy').format(current));
+      current = DateTime(current.year, current.month + 1);
+    }
+    return months;
+  }
+
+  Future<void> _showAddStatusDialog(BuildContext context, String memberId,
+      String trainingId, String monthYear) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return AddStatusDialog(docId: docId);
+        return AddStatusDialog(
+          memberId: memberId,
+          teamId: teamId,
+          trainingId: trainingId,
+          monthYear: monthYear,
+        );
       },
     );
   }
 
-  double _calculateAttendancePercentage(String memberId) {
-    if (memberTrainings[memberId] == null ||
-        memberTrainings[memberId]!.isEmpty) {
-      return 0.0;
+  double _calculateAttendancePercentage() {
+    int totalTrainings = 0;
+    int attendedCount = 0;
+
+    for (var trainings in monthlyTrainings.values) {
+      for (var trening in trainings) {
+        if (trening.containsKey('Status')) {
+          totalTrainings++;
+          if (trening['Status'] == 'Prisutna') {
+            attendedCount++;
+          }
+        }
+      }
     }
-    List<Map<String, dynamic>> trainings = memberTrainings[memberId]!;
-    int attendedCount =
-        trainings.where((trening) => trening['Status'] == 'Prisutna').length;
-    return (attendedCount / trainings.length) * 100;
+
+    return totalTrainings == 0 ? 0.0 : (attendedCount / totalTrainings) * 100;
   }
 
   @override
   Widget build(BuildContext context) {
-    double attendancePercentage = _calculateAttendancePercentage(widget.docId);
-    print('Att perc: $attendancePercentage');
-    List<String> months = monthlyTrainings.keys.toList();
+    double attendancePercentage = _calculateAttendancePercentage();
 
     return DefaultTabController(
-      length: months.length,
+      length: availableMonths.length,
       child: Scaffold(
         appBar: AppBar(
           title: Row(
@@ -148,9 +308,7 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
                 size: 35,
                 color: attendancePercentage >= 60 ? Colors.green : Colors.red,
               ),
-              const SizedBox(
-                width: 25,
-              ),
+              const SizedBox(width: 25),
               Text(
                 '${attendancePercentage.toStringAsFixed(1)}%',
                 style: TextStyle(
@@ -160,24 +318,28 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
             ],
           ),
           centerTitle: true,
-          automaticallyImplyLeading: false,
-          bottom: TabBar(
-            isScrollable: true,
-            tabs: months.map((month) => Tab(text: month)).toList(),
-          ),
+          bottom: isLoading
+              ? null
+              : TabBar(
+                  isScrollable: true,
+                  tabs:
+                      availableMonths.map((month) => Tab(text: month)).toList(),
+                  onTap: (index) {
+                    String selectedMonth = availableMonths[index];
+                    _getTrainingsForMonth(selectedMonth);
+                  },
+                ),
         ),
-        body: monthlyTrainings.isEmpty
-            ? Center(child: Text('No trainings found'))
+        body: isLoading
+            ? Center(child: CircularProgressIndicator())
             : TabBarView(
-                children: months.map((month) {
+                children: availableMonths.map((month) {
                   List<Map<String, dynamic>> trainings =
                       monthlyTrainings[month] ?? [];
-                  _calculateAttendancePercentage(widget.docId);
 
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
+                  return trainings.isEmpty
+                      ? Center(child: Text('No trainings found for $month'))
+                      : ListView.builder(
                           itemCount: trainings.length,
                           itemBuilder: (context, index) {
                             Map<String, dynamic> trening = trainings[index];
@@ -197,18 +359,20 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
                                       Text(trening['Datum']),
                                       if (trening['Status'] == 'Prisutna')
                                         Icon(Icons.check_circle,
-                                            color: Colors.green),
-                                      if (trening['Status'] == 'Odsutna')
+                                            color: Colors.green)
+                                      else if (trening['Status'] == 'Odsutna')
                                         Icon(Icons.block_outlined,
-                                            color: Colors.red),
-                                      if (trening['Status'] == null)
+                                            color: Colors.red)
+                                      else
                                         IconButton(
                                           icon: const Icon(
                                               Icons.add_circle_outline),
                                           onPressed: () {
                                             _showAddStatusDialog(
-                                                context, trening['DocId']);
-                                            _getAllTrenings();
+                                                context,
+                                                widget.docId,
+                                                trening['trainingId'],
+                                                trening['monthId']);
                                           },
                                         ),
                                     ],
@@ -227,10 +391,7 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
                               ),
                             );
                           },
-                        ),
-                      ),
-                    ],
-                  );
+                        );
                 }).toList(),
               ),
       ),

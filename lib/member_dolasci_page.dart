@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:mtim/firebase_api.dart';
 import 'package:mtim/notification_service.dart';
 
 class MemberDolasciPage extends StatefulWidget {
@@ -29,7 +28,8 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
       return;
     }
 
-    String? email = user?.email!;
+    String? email = user?.email;
+    print('User email: $email');
 
     try {
       QuerySnapshot querySnapshot = await FirebaseFirestore.instance
@@ -37,12 +37,18 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
           .where('Email', isEqualTo: email)
           .get();
 
+      print('Number of documents found: ${querySnapshot.docs.length}');
+
       if (querySnapshot.docs.isNotEmpty) {
         DocumentSnapshot documentSnapshot = querySnapshot.docs.first;
         userId = documentSnapshot.id;
         print('User id: $userId');
 
-        _getAllTrainings();
+        DateTime now = DateTime.now();
+        DateTime startDate = DateTime(now.year, now.month - 12);
+        DateTime endDate = DateTime(now.year, now.month + 1);
+
+        await _getAllTrainings(userId!, startDate, endDate);
       } else {
         print("No member found with email $email");
       }
@@ -51,86 +57,132 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
     }
   }
 
-  void _getAllTrainings() {
-    if (userId == null) return;
+  Future<void> _getAllTrainings(
+      String memberId, DateTime startDate, DateTime endDate) async {
+    List<Map<String, dynamic>> allTrainings = [];
+    List<String> monthYears = _generateMonthRange(startDate, endDate);
+    print(
+        'Fetching trainings for memberId: $memberId, from ${startDate.toIso8601String()} to ${endDate.toIso8601String()}');
+    print('Months to fetch: $monthYears');
 
-    FirebaseFirestore.instance
-        .collection('Clanica_Tim_Trening')
-        .where('ClanicaUID', isEqualTo: userId)
-        .snapshots()
-        .listen((querySnapshot) async {
-      if (querySnapshot.docs.isEmpty) {
-        print('No documents found for ClanicaUID: $userId');
-        return;
+    try {
+      for (String monthId in monthYears) {
+        CollectionReference teamCollectionRef =
+            FirebaseFirestore.instance.collection('Clanica_Tim_Trening_2');
+
+        QuerySnapshot teamSnapshot = await teamCollectionRef.get();
+        print('Number of teams found: ${teamSnapshot.docs.length}');
+
+        for (var teamDoc in teamSnapshot.docs) {
+          CollectionReference monthCollectionRef =
+              teamDoc.reference.collection(monthId);
+          QuerySnapshot trainingSnapshot = await monthCollectionRef.get();
+          print(
+              'Number of training documents found for team ${teamDoc.id} in month $monthId: ${trainingSnapshot.docs.length}');
+
+          for (var trainingDoc in trainingSnapshot.docs) {
+            CollectionReference membersCollectionRef =
+                trainingDoc.reference.collection('Members');
+            QuerySnapshot membersSnapshot = await membersCollectionRef
+                .where('ClanicaUID', isEqualTo: memberId)
+                .get();
+
+            print(
+                'Number of members found for training ${trainingDoc.id}: ${membersSnapshot.docs.length}');
+
+            if (membersSnapshot.docs.isNotEmpty) {
+              Map<String, dynamic> trainingData =
+                  trainingDoc.data() as Map<String, dynamic>;
+              Timestamp startTimestamp =
+                  trainingData['Početak'] ?? Timestamp.now();
+              Timestamp endTimestamp = trainingData['Kraj'] ?? Timestamp.now();
+
+              DocumentReference memberDocRef = FirebaseFirestore.instance
+                  .collection('Clanica_Tim_Trening_2')
+                  .doc(trainingData['Tim'])
+                  .collection(monthId)
+                  .doc(trainingDoc.id)
+                  .collection('Members')
+                  .doc(memberId);
+
+              DocumentSnapshot memberDoc = await memberDocRef.get();
+              Map<String, dynamic>? memberData =
+                  memberDoc.data() as Map<String, dynamic>?;
+
+              allTrainings.add({
+                'trainingId': trainingDoc.id,
+                'monthId': monthId,
+                'startTimestamp': startTimestamp,
+                'Početak': _formatTimeOnly(startTimestamp),
+                'Kraj': _formatTimeOnly(endTimestamp),
+                'Mjesto': trainingData['Mjesto'] ?? 'Unknown',
+                'Status': memberData != null && memberData.containsKey('Status')
+                    ? memberData['Status']
+                    : 'Unknown',
+                'Dolazak':
+                    memberData != null && memberData.containsKey('Dolazak')
+                        ? _formatTimeOnly(memberData['Dolazak'])
+                        : '',
+                'Odlazak':
+                    memberData != null && memberData.containsKey('Odlazak')
+                        ? _formatTimeOnly(memberData['Odlazak'])
+                        : '',
+                'Date': _formatDateOnly(startTimestamp),
+                'Tim': trainingData['Tim'] ?? 'Unknown',
+                'IsToday': _checkIfTrainingToday(startTimestamp),
+              });
+
+              if (_checkIfTrainingToday(startTimestamp)) {
+                NotificationService().showNotificationDanasTrening(
+                    trainingData['Mjesto'], startTimestamp.toDate());
+              }
+            }
+          }
+        }
       }
+
+      allTrainings
+          .sort((a, b) => b['startTimestamp'].compareTo(a['startTimestamp']));
 
       Map<String, List<Map<String, dynamic>>> groupedTrainings = {};
-      List<Future<void>> fetchTasks = [];
-
-      for (var doc in querySnapshot.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        var timTreningId = data['Tim_TreningUID'];
-
-        fetchTasks.add(FirebaseFirestore.instance
-            .collection('Tim_Trening')
-            .doc(timTreningId)
-            .get()
-            .then((timTreningSnapshot) {
-          if (!timTreningSnapshot.exists) {
-            print('No Tim_Trening document found with ID: $timTreningId');
-            return;
-          }
-
-          var timTreningData =
-              timTreningSnapshot.data() as Map<String, dynamic>;
-          Timestamp pocetak = timTreningData['Početak'];
-          String monthKey = DateFormat('MM/yyyy').format(pocetak.toDate());
-
-          var treningData = {
-            'DocId': doc.id,
-            'Dolazak': data['Dolazak'] != null
-                ? _formatTimestamp(data['Dolazak'])
-                : null,
-            'Odlazak': data['Odlazak'] != null
-                ? _formatTimestamp(data['Odlazak'])
-                : null,
-            'Status': data['Status'],
-            'Datum': _formatDateOnly(pocetak),
-            'Početak': _formatTimestamp(pocetak),
-            'Kraj': _formatTimestamp(timTreningData['Kraj']),
-            'Mjesto': timTreningData['Mjesto'],
-            'TrainingStatus': timTreningData['Status'],
-            'IsToday': _checkIfTrainingToday(pocetak),
-          };
-
-          if (_checkIfTrainingToday(pocetak)) {
-            /*FirebaseApi().initPushNotifications(
-                timTreningData['Mjesto'], pocetak.toDate());*/
-            NotificationService().showNotificationDanasTrening(
-                timTreningData['Mjesto'], pocetak.toDate());
-          }
-
-          if (!groupedTrainings.containsKey(monthKey)) {
-            groupedTrainings[monthKey] = [];
-          }
-          groupedTrainings[monthKey]?.add(treningData);
-        }));
+      for (var training in allTrainings) {
+        String monthKey = training['monthId'];
+        if (!groupedTrainings.containsKey(monthKey)) {
+          groupedTrainings[monthKey] = [];
+        }
+        groupedTrainings[monthKey]?.add(training);
       }
-      await Future.wait(fetchTasks);
+
+      print('Grouped trainings: ${groupedTrainings.keys.toList()}');
+
       setState(() {
         monthlyTrainings = groupedTrainings;
       });
-    });
+    } catch (e) {
+      print('Error fetching trainings: $e');
+    }
   }
 
-  String _formatTimestamp(Timestamp timestamp) {
+  String _formatTimeOnly(Timestamp timestamp) {
     DateTime date = timestamp.toDate();
-    return DateFormat('dd.MM.yyyy HH:mm').format(date);
+    return DateFormat('HH:mm').format(date);
   }
 
   String _formatDateOnly(Timestamp timestamp) {
     DateTime date = timestamp.toDate();
     return DateFormat('dd.MM.yyyy').format(date);
+  }
+
+  List<String> _generateMonthRange(DateTime start, DateTime end) {
+    List<String> months = [];
+    DateTime current = DateTime(start.year, start.month);
+
+    while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+      months.add(DateFormat('MM-yyyy').format(current));
+      current = DateTime(current.year, current.month + 1);
+    }
+
+    return months;
   }
 
   bool _checkIfTrainingToday(Timestamp? timestamp) {
@@ -153,19 +205,11 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
 
   @override
   Widget build(BuildContext context) {
-    List<DateTime> sortedMonths = monthlyTrainings.keys.map((month) {
-      return DateFormat('MM/yyyy').parse(month);
-    }).toList()
+    List<String> sortedMonthKeys = monthlyTrainings.keys.toList()
       ..sort((a, b) => b.compareTo(a));
 
-    List<String> sortedMonthKeys = sortedMonths.map((dateTime) {
-      return DateFormat('MM/yyyy').format(dateTime);
-    }).toList();
-
-    List<String> months = monthlyTrainings.keys.toList();
-
     return DefaultTabController(
-      length: months.length,
+      length: sortedMonthKeys.length,
       child: Scaffold(
         appBar: AppBar(
           bottom: TabBar(
@@ -230,14 +274,15 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(trening['Datum']),
+                                      Text(
+                                          '${trening['Date']}, ${trening['Početak']} - ${trening['Kraj']}'),
                                       if (trening['Status'] == 'Prisutna')
                                         Icon(Icons.check_circle,
                                             color: Colors.green),
                                       if (trening['Status'] == 'Odsutna')
                                         Icon(Icons.block_outlined,
                                             color: Colors.red),
-                                      if (trening['Status'] == null)
+                                      if (trening['Status'] == 'Unknown')
                                         Icon(Icons.watch_later_outlined),
                                     ],
                                   ),
@@ -245,10 +290,9 @@ class _MemberDolasciPageState extends State<MemberDolasciPage> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      if (trening['Dolazak'] != null)
-                                        Text('Dolazak: ${trening['Dolazak']}'),
-                                      if (trening['Odlazak'] != null)
-                                        Text('Odlazak: ${trening['Odlazak']}'),
+                                      Text('${trening['Mjesto']}'),
+                                      Text('Dolazak: ${trening['Dolazak']}'),
+                                      Text('Odlazak: ${trening['Odlazak']}'),
                                     ],
                                   ),
                                 ),
