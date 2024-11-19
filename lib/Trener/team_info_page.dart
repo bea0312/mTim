@@ -189,111 +189,113 @@ class _TeamInfoPageState extends State<TeamInfoPage> {
     double percentageOutOfAgeGroup = _percentageOutOfAgeGroup();
 
     return Scaffold(
-      body: Center(
-        child: Container(
-          width: screenWidth * 0.9,
-          height: screenHeight * 0.65,
-          margin: const EdgeInsets.symmetric(horizontal: 16.0),
-          padding: const EdgeInsets.all(8.0),
-          child: Card(
-            color: Colors.purple[100],
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15.0),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Column(
-                    children: [
-                      Text('Broj članica'),
-                      Text(
-                        '$numberOfMembers',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      )
-                    ],
-                  ),
-                  Divider(
-                    color: Colors.purple,
-                    thickness: 2,
-                    indent: 0,
-                    endIndent: 16,
-                  ),
-                  Column(
-                    children: [
-                      Text('Izvan dobnog razreda'),
-                      Text(
-                        '$numOfMembersOutOfAgeGroup',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      )
-                    ],
-                  ),
-                  const Divider(
-                    color: Colors.purple,
-                    thickness: 2,
-                    indent: 0,
-                    endIndent: 16,
-                  ),
-                  Column(
-                    children: [
-                      Text('Postotak izvan dobnog rareda'),
-                      Text(
-                        '${percentageOutOfAgeGroup.toStringAsFixed(1)}%',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      )
-                    ],
-                  ),
-                  Padding(
-                    padding: EdgeInsets.only(top: screenHeight * 0.2),
-                    child: Column(
+      body: SingleChildScrollView(
+        child: Center(
+          child: Container(
+            width: screenWidth * 0.9,
+            height: screenHeight * 0.65,
+            margin: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.all(8.0),
+            child: Card(
+              color: Colors.purple[100],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15.0),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Column(
                       children: [
-                        Center(
-                          child: GestureDetector(
-                            onTap: () {
-                              _addNewMember(context);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(8.0),
-                              decoration: BoxDecoration(
-                                borderRadius: const BorderRadius.all(
-                                    Radius.circular(15.0)),
-                                color: Colors.white,
-                                border:
-                                    Border.all(color: Colors.purple, width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.5),
-                                    spreadRadius: 5,
-                                    blurRadius: 7,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.add_circle_outline,
-                                      color: Colors.purple),
-                                  Text(
-                                    ' Dodaj članicu',
-                                  ),
-                                ],
+                        Text('Broj članica'),
+                        Text(
+                          '$numberOfMembers',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                        )
+                      ],
+                    ),
+                    Divider(
+                      color: Colors.purple,
+                      thickness: 2,
+                      indent: 0,
+                      endIndent: 16,
+                    ),
+                    Column(
+                      children: [
+                        Text('Izvan dobnog razreda'),
+                        Text(
+                          '$numOfMembersOutOfAgeGroup',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                        )
+                      ],
+                    ),
+                    const Divider(
+                      color: Colors.purple,
+                      thickness: 2,
+                      indent: 0,
+                      endIndent: 16,
+                    ),
+                    Column(
+                      children: [
+                        Text('Postotak izvan dobnog rareda'),
+                        Text(
+                          '${percentageOutOfAgeGroup.toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                        )
+                      ],
+                    ),
+                    Padding(
+                      padding: EdgeInsets.only(top: screenHeight * 0.2),
+                      child: Column(
+                        children: [
+                          Center(
+                            child: GestureDetector(
+                              onTap: () {
+                                _addNewMember(context);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8.0),
+                                decoration: BoxDecoration(
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(15.0)),
+                                  color: Colors.white,
+                                  border: Border.all(
+                                      color: Colors.purple, width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withOpacity(0.5),
+                                      spreadRadius: 5,
+                                      blurRadius: 7,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add_circle_outline,
+                                        color: Colors.purple),
+                                    Text(
+                                      ' Dodaj članicu',
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  /*IconButton(
-                      onPressed: () {
-                        exportExcel(context);
-                      },
-                      icon: const Icon(Icons.download_for_offline_outlined))*/
-                ],
+                    /*IconButton(
+                        onPressed: () {
+                          exportExcel(context);
+                        },
+                        icon: const Icon(Icons.download_for_offline_outlined))*/
+                  ],
+                ),
               ),
             ),
           ),

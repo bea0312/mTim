@@ -16,7 +16,6 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
   Map<String, List<Map<String, dynamic>>> monthlyTrainings = {};
   List<String> availableMonths = [];
   bool isLoading = true;
-  String teamId = '';
   String currentMonth = DateFormat('MM-yyyy').format(DateTime.now());
 
   @override
@@ -40,8 +39,6 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
       QuerySnapshot teamSnapshot = await teamCollectionRef.get();
 
       for (var teamDoc in teamSnapshot.docs) {
-        teamId = teamDoc.id;
-
         for (String monthId in monthRange) {
           CollectionReference monthCollectionRef =
               teamDoc.reference.collection(monthId);
@@ -49,7 +46,6 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
               await monthCollectionRef.limit(1).get();
 
           if (trainingSnapshot.docs.isNotEmpty) {
-            print("Found trainings for month: $monthId");
             monthsWithTrainings.add(monthId);
           }
         }
@@ -82,6 +78,8 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
       QuerySnapshot teamSnapshot = await teamCollectionRef.get();
 
       for (var teamDoc in teamSnapshot.docs) {
+        String teamId = teamDoc.id;
+
         CollectionReference monthCollectionRef =
             teamDoc.reference.collection(monthId);
         QuerySnapshot trainingSnapshot = await monthCollectionRef.get();
@@ -132,6 +130,7 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
                         : '',
                 'Datum': _formatDateOnly(startTimestamp),
                 'Tim': trainingData['Tim'] ?? 'Unknown',
+                'Team': teamId
               };
 
               monthTrainings.add(trening);
@@ -156,87 +155,13 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
   }
 
   Future<void> _getTrainingsForCurrentMonth() async {
-    List<Map<String, dynamic>> monthTrainings = [];
-    try {
-      CollectionReference teamCollectionRef =
-          FirebaseFirestore.instance.collection('Clanica_Tim_Trening_2');
-      QuerySnapshot teamSnapshot = await teamCollectionRef.get();
-
-      for (var teamDoc in teamSnapshot.docs) {
-        CollectionReference monthCollectionRef =
-            teamDoc.reference.collection(currentMonth);
-        QuerySnapshot trainingSnapshot = await monthCollectionRef.get();
-
-        if (trainingSnapshot.docs.isNotEmpty) {
-          for (var trainingDoc in trainingSnapshot.docs) {
-            CollectionReference membersCollectionRef =
-                trainingDoc.reference.collection('Members');
-            QuerySnapshot membersSnapshot = await membersCollectionRef
-                .where('ClanicaUID', isEqualTo: widget.docId)
-                .get();
-
-            if (membersSnapshot.docs.isNotEmpty) {
-              Map<String, dynamic> trainingData =
-                  trainingDoc.data() as Map<String, dynamic>;
-              Timestamp startTimestamp =
-                  trainingData['Početak'] ?? Timestamp.now();
-              Timestamp endTimestamp = trainingData['Kraj'] ?? Timestamp.now();
-
-              DocumentSnapshot memberDoc = await FirebaseFirestore.instance
-                  .collection('Clanica_Tim_Trening_2')
-                  .doc(teamId)
-                  .collection(currentMonth)
-                  .doc(trainingDoc.id)
-                  .collection('Members')
-                  .doc(widget.docId)
-                  .get();
-              Map<String, dynamic>? memberData =
-                  memberDoc.data() as Map<String, dynamic>?;
-
-              var trening = {
-                'trainingId': trainingDoc.id,
-                'monthId': currentMonth,
-                'startTimestamp': startTimestamp,
-                'Početak': _formatTimeOnly(startTimestamp),
-                'Kraj': _formatTimeOnly(endTimestamp),
-                'Mjesto': trainingData['Mjesto'] ?? 'Unknown',
-                'Status': memberData != null && memberData.containsKey('Status')
-                    ? memberData['Status']
-                    : 'Unknown',
-                'Dolazak':
-                    memberData != null && memberData.containsKey('Dolazak')
-                        ? _formatTimeOnly(memberData['Dolazak'])
-                        : '',
-                'Odlazak':
-                    memberData != null && memberData.containsKey('Odlazak')
-                        ? _formatTimeOnly(memberData['Odlazak'])
-                        : '',
-                'Datum': _formatDateOnly(startTimestamp),
-                'Tim': trainingData['Tim'] ?? 'Unknown',
-              };
-
-              monthTrainings.add(trening);
-            }
-          }
-        }
-      }
-
-      monthTrainings
-          .sort((a, b) => b['startTimestamp'].compareTo(a['startTimestamp']));
-
-      setState(() {
-        monthlyTrainings[currentMonth] = monthTrainings;
-      });
-    } catch (e) {
-      print('Error fetching trainings for current month: $e');
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
+    await _getTrainingsForMonth(currentMonth);
   }
 
-  String _formatTimeOnly(Timestamp timestamp) {
+  String _formatTimeOnly(dynamic timestamp) {
+    if (timestamp == null || timestamp is! Timestamp) {
+      return 'Unknown';
+    }
     DateTime date = timestamp.toDate();
     return DateFormat('HH:mm').format(date);
   }
@@ -257,7 +182,7 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
     return months;
   }
 
-  Future<void> _showAddStatusDialog(BuildContext context, String memberId,
+  Future<void> _showAddStatusDialog(String memberId, String teamId,
       String trainingId, String monthYear) async {
     return showDialog<void>(
       context: context,
@@ -369,8 +294,8 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
                                               Icons.add_circle_outline),
                                           onPressed: () {
                                             _showAddStatusDialog(
-                                                context,
                                                 widget.docId,
+                                                trening['Team'],
                                                 trening['trainingId'],
                                                 trening['monthId']);
                                           },
@@ -381,10 +306,10 @@ class _MemberInfoPageDolasciState extends State<MemberInfoPageDolasci> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      if (trening['Dolazak'] != null)
-                                        Text('Dolazak: ${trening['Dolazak']}'),
-                                      if (trening['Odlazak'] != null)
-                                        Text('Odlazak: ${trening['Odlazak']}'),
+                                      Text(
+                                          'Dolazak: ${trening['Dolazak'] ?? 'N/A'}'),
+                                      Text(
+                                          'Odlazak: ${trening['Odlazak'] ?? 'N/A'}'),
                                     ],
                                   ),
                                 ),

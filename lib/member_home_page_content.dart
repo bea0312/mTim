@@ -146,104 +146,108 @@ class _MemberHomePageContentState extends State<MemberHomePageContent> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15.0),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10.0, left: 10),
-                        child: SizedBox(
-                          width: 100,
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Ime',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.normal),
-                                    ),
-                                    Text(
-                                      '${memberData?['Ime'] ?? ''}',
-                                      style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(
-                                  height: 20,
-                                ),
-                                const Text(
-                                  'Prezime',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.normal,
+                  child: SingleChildScrollView(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10.0, left: 10),
+                          child: SizedBox(
+                            width: 100,
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Ime',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.normal),
+                                      ),
+                                      Text(
+                                        '${memberData?['Ime'] ?? ''}',
+                                        style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                Text(
-                                  '${memberData?['Prezime'] ?? ''}',
-                                  style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ]),
-                        ),
-                      ),
-                      const VerticalDivider(
-                        color: Colors.purple,
-                        thickness: 2,
-                        width: 20,
-                        indent: 15,
-                        endIndent: 15,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0, top: 10),
-                        child: SizedBox(
-                          width: 100,
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Datum rođenja',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.normal),
-                                    ),
-                                    Text(
-                                      '${memberData?['Datum rođenja'] ?? ''}',
-                                      style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(
-                                  height: 20,
-                                ),
-                                const Text(
-                                  'OIB',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.normal,
+                                  const SizedBox(
+                                    height: 20,
                                   ),
-                                ),
-                                Text(
-                                  '${memberData?['OIB'] ?? ''}',
-                                  style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ]),
+                                  const Text(
+                                    'Prezime',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.normal,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${memberData?['Prezime'] ?? ''}',
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ]),
+                          ),
                         ),
-                      ),
-                    ],
+                        const VerticalDivider(
+                          color: Colors.purple,
+                          thickness: 2,
+                          width: 20,
+                          indent: 15,
+                          endIndent: 15,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0, top: 10),
+                          child: SizedBox(
+                            width: 100,
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Datum rođenja',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.normal),
+                                      ),
+                                      Text(
+                                        '${memberData?['Datum rođenja'] ?? ''}',
+                                        style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(
+                                    height: 20,
+                                  ),
+                                  const Text(
+                                    'OIB',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.normal,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${memberData?['OIB'] ?? ''}',
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ]),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

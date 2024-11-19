@@ -221,7 +221,7 @@ class _TrainingsPageState extends State<TrainingsPage> {
         SnackBar(content: Text('NFC scanning started.')),
       );
 
-      _nfcStartSessionTimer = Timer(Duration(seconds: 5), () {
+      _nfcStartSessionTimer = Timer(const Duration(minutes: 20), () {
         if (mounted) {
           NfcManager.instance.stopSession();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -290,40 +290,64 @@ class _TrainingsPageState extends State<TrainingsPage> {
       QuerySnapshot membersSnapshot =
           await trainingRef.collection('Members').get();
 
-      for (var doc in membersSnapshot.docs) {
-        var memberData = doc.data() as Map<String, dynamic>;
-        var docId = doc.id;
+      NfcManager.instance.startSession(onDiscovered: (NfcTag badge) async {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('NFC scanning started for training end.')),
+        );
+        _nfcSessionTimer = Timer(const Duration(minutes: 10), () {
+          if (mounted) {
+            NfcManager.instance.stopSession();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('NFC session automatically stopped.')),
+            );
+          }
+        });
 
-        if (memberData['Dolazak'] == null) {
-          await FirebaseFirestore.instance
-              .collection('Clanica_Tim_Trening_2')
-              .doc(teamName)
-              .collection(monthYear)
-              .doc(trainingId)
-              .collection('Members')
-              .doc(docId)
-              .update({
-            'Status': 'Odsutna',
-          });
-        } else {
-          await FirebaseFirestore.instance
-              .collection('Clanica_Tim_Trening_2')
-              .doc(teamName)
-              .collection(monthYear)
-              .doc(trainingId)
-              .collection('Members')
-              .doc(docId)
-              .update({
-            'Odlazak': Timestamp.now(),
-          });
-          print("Member $docId 'Odlazak' updated");
+        try {
+          for (var doc in membersSnapshot.docs) {
+            var memberData = doc.data() as Map<String, dynamic>;
+            var docId = doc.id;
+
+            if (memberData['Dolazak'] == null) {
+              await FirebaseFirestore.instance
+                  .collection('Clanica_Tim_Trening_2')
+                  .doc(teamName)
+                  .collection(monthYear)
+                  .doc(trainingId)
+                  .collection('Members')
+                  .doc(docId)
+                  .update({
+                'Status': 'Odsutna',
+              });
+            } else {
+              await FirebaseFirestore.instance
+                  .collection('Clanica_Tim_Trening_2')
+                  .doc(teamName)
+                  .collection(monthYear)
+                  .doc(trainingId)
+                  .collection('Members')
+                  .doc(docId)
+                  .update({
+                'Odlazak': Timestamp.now(),
+              });
+              print("Member $docId 'Odlazak' updated");
+            }
+          }
+        } catch (e) {
+          print('Error: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        } finally {
+          if (_nfcSessionTimer?.isActive ?? false) {
+            _nfcSessionTimer?.cancel();
+          }
+          NfcManager.instance.stopSession();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('NFC scanning stopped.')),
+          );
         }
-      }
-
-      NfcManager.instance.stopSession();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('NFC session stopped.')),
-      );
+      });
     } catch (e) {
       print('Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(

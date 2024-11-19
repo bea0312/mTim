@@ -267,15 +267,20 @@ class _DolasciPageState extends State<DolasciPage> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(memberName),
+                                        Text(
+                                          memberName,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                          ),
+                                        ),
                                         Text(
                                           '${attendancePercentage.toStringAsFixed(2)}%',
                                           style: TextStyle(
-                                            color: attendancePercentage >= 60
-                                                ? Colors.green
-                                                : Colors.red,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                              color: attendancePercentage >= 60
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12),
                                         ),
                                       ],
                                     ),

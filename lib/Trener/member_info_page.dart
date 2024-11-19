@@ -192,6 +192,33 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
     );
   }
 
+  Widget textLabel(String text) {
+    return Text(
+      text,
+      style: TextStyle(fontSize: 10, fontWeight: FontWeight.normal),
+    );
+  }
+
+  Widget textField(String text) {
+    return Text(
+      '${widget.memberData[text]}',
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget divider() {
+    return const Column(
+      children: [
+        Divider(
+          color: Colors.purple,
+          thickness: 2,
+          indent: 0,
+          endIndent: 16,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -253,36 +280,15 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
-                                        'OIB',
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.normal),
-                                      ),
-                                      Text(
-                                        '${widget.memberData['OIB']}',
-                                        style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold),
-                                      ),
+                                      textLabel('OIB'),
+                                      textField('OIB'),
                                     ],
                                   ),
                                   const SizedBox(
                                     height: 20,
                                   ),
-                                  const Text(
-                                    'Datum rođenja',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.normal,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${widget.memberData['Datum rođenja']}',
-                                    style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold),
-                                  ),
+                                  textLabel('Datum rođenja'),
+                                  textField('Datum rođenja'),
                                 ]),
                           ),
                         ),
@@ -443,93 +449,37 @@ class _MemberInfoPageState extends State<MemberInfoPage> {
                                 ),
                                 Column(
                                   children: [
-                                    Text(
-                                      '${widget.memberData['Adresa']}',
-                                      style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold),
-                                    ),
+                                    textField('Adresa'),
                                   ],
                                 ),
-                                const Column(
-                                  children: [
-                                    Divider(
-                                      color: Colors.purple,
-                                      thickness: 2,
-                                      indent: 0,
-                                      endIndent: 16,
-                                    ),
-                                  ],
-                                ),
+                                divider(),
                                 const Column(
                                   children: [Text('Broj mobitela članice')],
                                 ),
                                 Column(
                                   children: [
-                                    Text(
-                                      '${widget.memberData['Broj mobitela članice']}',
-                                      style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold),
-                                    ),
+                                    textField('Broj mobitela članice'),
                                   ],
                                 ),
-                                const Column(
-                                  children: [
-                                    Divider(
-                                      color: Colors.purple,
-                                      thickness: 2,
-                                      indent: 0,
-                                      endIndent: 16,
-                                    ),
-                                  ],
-                                ),
+                                divider(),
                                 const Column(
                                   children: [Text('Broj mobitela roditelja')],
                                 ),
                                 Column(
                                   children: [
-                                    Text(
-                                      '${widget.memberData['Broj mobitela roditelja']}',
-                                      style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold),
-                                    ),
+                                    textField('Broj mobitela roditelja'),
                                   ],
                                 ),
-                                const Column(
-                                  children: [
-                                    Divider(
-                                      color: Colors.purple,
-                                      thickness: 2,
-                                      indent: 0,
-                                      endIndent: 16,
-                                    ),
-                                  ],
-                                ),
+                                divider(),
                                 const Column(
                                   children: [Text('Članica od')],
                                 ),
                                 Column(
                                   children: [
-                                    Text(
-                                      '${widget.memberData['Članica od']}',
-                                      style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold),
-                                    ),
+                                    textField('Članica od'),
                                   ],
                                 ),
-                                const Column(
-                                  children: [
-                                    Divider(
-                                      color: Colors.purple,
-                                      thickness: 2,
-                                      indent: 0,
-                                      endIndent: 16,
-                                    ),
-                                  ],
-                                ),
+                                divider(),
                                 const Column(children: [Text('GDPR')]),
                                 Column(
                                   children: [
